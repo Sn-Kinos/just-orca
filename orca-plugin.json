@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 1,
+  "id": "git-log-graph",
+  "publisher": "kinos",
+  "name": "Git Log Graph",
+  "version": "0.1.0",
+  "description": "Commit graph of the focused worktree including all submodules, opened in an Orca browser tab.",
+  "engines": { "orca": ">=1.4.0" },
+  "pluginApi": 1,
+  "main": "main.mjs",
+  "contributes": {
+    "commands": [{ "id": "open-graph", "title": "Git Log: Open Graph (with submodules)", "context": "worktree" }],
+    "keybindings": [{ "command": "open-graph", "key": "Mod+Alt+L", "when": "worktree" }]
+  },
+  "capabilities": [{ "kind": "workspace:read" }, { "kind": "notifications:show" }]
+}
