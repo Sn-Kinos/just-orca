@@ -58,8 +58,9 @@ export async function resolveWorktree(ctx, log = console.log) {
 export async function openInOrca(file, worktreeId) {
   const url = pathToFileURL(file).href
   const worktree = `id:${worktreeId}`
-  const { tabs } = await cli(['tab', 'list', '--worktree', worktree, '--json'])
-  const existing = tabs.find((tab) => tab.url === url)
+  // `tab list --worktree id:<x>` blocks ~8s when that worktree has no browser tab; `all` returns in ~0.15s.
+  const { tabs } = await cli(['tab', 'list', '--worktree', 'all', '--json'])
+  const existing = tabs.find((tab) => tab.url === url && tab.worktreeId === worktreeId)
   if (existing) {
     if (!existing.browserPageId) throw new Error('existing graph tab has no browser page id')
     return cli(['goto', '--url', url, '--page', existing.browserPageId, '--json'])
