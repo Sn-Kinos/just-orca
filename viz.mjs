@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 export async function collectRepos(rootPath, { limit = 500 } = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('limit must be a positive integer');
   const root = resolve(rootPath);
+  await access(root).catch(() => { throw new Error(`Repository path not found: ${root}`); });
   const git = async (cwd, ...args) => (await promisify(execFile)('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 })).stdout;
   const names = ['.', ...(await git(root, 'submodule', 'foreach', '--recursive', '-q', 'echo "$displaypath"')).split('\n').filter(Boolean)];
   const pins = new Map();
