@@ -81,8 +81,8 @@ export default function activate(orca) {
       await mkdir(directory, { recursive: true })
       await writeFile(file, html, 'utf8')
       await openInOrca(file, worktreeId)
-      // The renderer emits one section per repository, including uninitialized submodules.
-      return { ok: true, file, worktreePath, repos: (html.match(/<section\b/gi) ?? []).length }
+      // The template renders one section per JSON repository, including uninitialized submodules.
+      return { ok: true, file, worktreePath, repos: JSON.parse(html.match(/<script id="repos" type="application\/json">([\s\S]*?)<\/script>/)[1]).length }
     } catch (cause) {
       const error = cause instanceof Error ? cause.message : String(cause)
       try {

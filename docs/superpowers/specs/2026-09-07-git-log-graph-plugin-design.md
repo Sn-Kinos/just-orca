@@ -18,8 +18,9 @@ Therefore: worker command → collect git data → write self-contained HTML →
 ```
 orca-plugin.json        manifest
 main.mjs                worker entry: activate(orca) registers command "open-graph"
-viz.mjs                 core: git collection + lane layout + HTML render; also a CLI
-test.mjs                one runnable check (node test.mjs): temp repo + submodule → HTML assertions
+viz.mjs                 core: git collection + exported lane layout + JSON/template assembly; also a CLI
+graph.html              static self-contained UI: inline CSS + plain JS components
+test.mjs                one runnable check (node test.mjs): temp repo + submodule → JSON/row assertions
 README.md               install (devPluginPaths), usage, limits
 ```
 
@@ -52,8 +53,8 @@ Validate field names/enums against the schema copy at
 
 ```js
 export async function collectRepos(rootPath, { limit = 500 } = {})  // → RepoGraph[]
-export function renderHtml(repos, { title })                        // → string (self-contained HTML)
-export async function buildGitLogHtml(rootPath, opts)               // collect + render
+export function layoutLanes(commits)                               // → rows with commit fields + lane metadata
+export async function buildGitLogHtml(rootPath, opts)               // collect + layout + inject JSON/title into graph.html
 // CLI: node viz.mjs <repoPath> [--limit N] [--out file.html]  → prints written path
 ```
 
@@ -73,12 +74,14 @@ Collection:
 - All git calls via `execFile('git', […], { cwd, maxBuffer: 64MB })`. Never shell-interpolate paths.
 
 Render:
-- Single HTML, inline CSS + JS, data embedded as `<script type="application/json">` (escape `</` as `<\/`). No CDN, no fonts, works over `file://`.
-- Lane layout (gitk-style): iterate commits in `--date-order`; keep an array of active lanes (each = a sha expected next). A commit takes the lane of the first active lane waiting for it (or a new lane); its first parent inherits that lane, other parents get new lanes; lanes whose sha was consumed close. Emit per-row `{ lane, parentsLanes[] }` → SVG paths (straight vertical + bezier for merges/branches). ~60 lines; O(rows × lanes).
-- One section per repo, root first then submodules in foreach order, each with a collapsible header `name · branch · N commits`. Submodule section highlights the `pinnedSha` row (badge "superproject HEAD").
-- Row: graph SVG cell | refs badges (branch/tag/HEAD distinct classes) | subject | author | relative date. Click sha → copies to clipboard. Filter input (author/subject/sha substring) hides rows without relayout (keeps graph honest: filtering only dims/hides text rows, graph column stays).
-- Colors via `prefers-color-scheme`; lane colors = fixed 8-color cycle.
-- `ponytail:` comment on the layout: capped at `limit` commits per repo; no incremental loading.
+- `graph.html` is the static presentation template: single HTML page with inline CSS + JS, no CDN, fonts, dependencies, or build step; works over `file://`. Open it directly to style it; the untouched data placeholder leaves a friendly “No data — run `node viz.mjs <repo>`” message.
+- `buildGitLogHtml` collects repositories, runs `layoutLanes(repo.commits)` for each, reads `graph.html` relative to `import.meta.url`, and replaces `/*__ORCA_GIT_LOG_DATA__*/` inside `<script id="repos" type="application/json">`. JSON escapes `</` as `<\/` and `<` as `\u003c` to prevent script breakouts. The HTML-escaped title replaces `__ORCA_GIT_LOG_TITLE__` in `<title>`; the page copies `document.title` into its heading.
+- Plain JS components `RepoSection(repo)`, `CommitRow(row, lanesWidth)`, `LaneGraph(row)`, and `RefBadge(ref)` assemble the UI from JSON. Git text is HTML-escaped before insertion. `Filter()` wires the search input; inline behaviors provide relative times and copy-SHA with a clipboard fallback.
+- Server-side `layoutLanes(commits)` keeps the gitk-style active-lane algorithm, returning commit fields plus `{ lane, parentsLanes, edges, incoming, width }` per row. First parents inherit lanes, other parents get new lanes, and consumed lanes close; the template only draws the prepared edges as SVG paths.
+- One collapsible section per repo, root first then submodules in collection order, with header `name · branch · N commits`. Submodule sections highlight the `pinnedSha` row with a “superproject HEAD” badge.
+- Row: graph SVG | SHA button | refs badges (branch/tag/HEAD classes) | subject | author | relative date. The author/subject/SHA substring filter dims non-matching row text without changing layout or the graph column.
+- Colors follow `prefers-color-scheme`; lanes use a fixed 8-color cycle.
+- `ponytail:` comment on layout: O(rows × lanes), capped at `limit` commits per repo; no incremental loading.
 
 ## `main.mjs` — worker
 
@@ -101,11 +104,13 @@ All CLI calls via `execFile(cli, args, { timeout: 15000 })`, JSON-parsed, `ok:fa
 
 ## Test (`test.mjs`, run with `node test.mjs`)
 
-Creates a temp superproject with 3 commits on two branches + a merge, one submodule (`git -c protocol.file.allow=always submodule add`) with 2 commits, pins the submodule at its first commit, then asserts on `buildGitLogHtml(tmp)`:
-- output contains every commit sha of both repos,
-- contains a section for `.` and for the submodule path,
-- the submodule's pinned sha row carries the `superproject HEAD` badge,
-- merge commit row has 2 parent lanes,
+Creates a temp superproject with 3 commits on two branches + a merge, one submodule (`git -c protocol.file.allow=always submodule add`) with 2 commits, pins the submodule at its first commit, then asserts on the JSON/rows embedded by `buildGitLogHtml(tmp)`:
+- rows contain every commit sha of both repos,
+- repository names (section inputs) are `.` then the submodule path,
+- the submodule's `pinnedSha` selects the row used for the highlight and `superproject HEAD` badge,
+- merge commit row has 2 parent lanes and lanes remain continuous,
+- hostile `</script>` subjects round-trip through JSON without breaking out of the data script,
+- the bare template contains the “No data” message and built output contains neither placeholder,
 - `collectRepos` on a repo with an uninitialized submodule returns `error` for it and still returns root.
 Plain `assert`, no framework. Cleans up temp dir.
 

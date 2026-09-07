@@ -2,6 +2,16 @@
 
 An Orca plugin that opens the focused worktree's commit graph, including recursive submodules, in an Orca browser tab. Requires Orca 1.4+, Git, and Node 20+. No npm dependencies or build step.
 
+## Files
+
+- `orca-plugin.json` — plugin manifest.
+- `main.mjs` — worker command and Orca tab integration.
+- `viz.mjs` — Git collection, exported lane layout, JSON/template assembly, and CLI.
+- `graph.html` — self-contained UI with plain JavaScript components and inline styles.
+- `test.mjs` — runnable collection, lane, and template checks.
+
+Open `graph.html` directly to style the page; without injected data it shows “No data — run `node viz.mjs <repo>`”.
+
 ## Dev install
 
 1. Open Orca → **Settings → Plugins** (macOS: **⌘,**, then **Plugins / 플러그인** under Experimental). Turn on **Plugin system** if it is off.
@@ -33,6 +43,8 @@ This takes the first live Orca terminal, builds a context using its `handle`, as
 ## Dev-loop caveat
 
 Because the plugin contributes a keybinding, Orca folds the live tree hash of a dev plugin into its consent fingerprint: every file save flips the plugin to "needs re-approval" until you approve it again in Settings → Plugins. Installed (non-dev) copies do not have this problem.
+
+If you keep a separate dev plugin copy to avoid re-approving every source edit, copy `orca-plugin.json`, `main.mjs`, `viz.mjs`, and **`graph.html`** into that folder. Keep `graph.html` next to `viz.mjs`; the CLI and worker load it relative to the module.
 
 ## Limits
 

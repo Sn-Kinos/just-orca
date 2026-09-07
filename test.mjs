@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collectRepos, renderHtml, buildGitLogHtml } from './viz.mjs';
+import { collectRepos, layoutLanes, buildGitLogHtml } from './viz.mjs';
 
 const temp = await mkdtemp(join(tmpdir(), 'git-log-graph-test-'));
 const root = join(temp, 'super project');
@@ -41,19 +41,27 @@ try {
   await git(root, 'commit', '-m', 'pin submodule');
 
   const html = await buildGitLogHtml(root);
-  for (const sha of [...(await git(root, 'rev-list', '--all')).split('\n'), pinned, subTip]) assert.ok(html.includes(sha), sha);
-  assert.ok(html.includes('<section data-repo=".">'));
-  assert.ok(html.includes('<section data-repo="libs/sub module">'));
-  const pinnedRow = html.split('\n').find(line => line.includes(`data-sha="${pinned}"`));
-  assert.ok(pinnedRow.includes('superproject HEAD'));
-  assert.ok(pinnedRow.includes('row pinned'));
-  const mergeRow = html.split('\n').find(line => line.includes(`data-sha="${merge}"`));
-  assert.equal(mergeRow.match(/data-parent-lanes="([^"]*)"/)[1].split(',').length, 2);
-  const data = JSON.parse(html.match(/<script id="repos" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+  const json = html.match(/<script id="repos" type="application\/json">([\s\S]*?)<\/script>/)[1];
+  const data = JSON.parse(json);
+  const shas = data.flatMap(repo => repo.rows.map(row => row.sha));
+  for (const sha of [...(await git(root, 'rev-list', '--all')).split('\n'), pinned, subTip]) assert.ok(shas.includes(sha), sha);
+  assert.deepEqual(data.map(repo => repo.name), ['.', 'libs/sub module']);
+  const pinnedRow = data[1].rows.find(row => row.sha === data[1].pinnedSha);
+  assert.equal(pinnedRow.sha, pinned);
+  const mergeRow = data[0].rows.find(row => row.sha === merge);
+  assert.equal(mergeRow.parentsLanes.length, 2);
   assert.equal(data[1].pinnedSha, pinned);
   assert.equal(data[1].commits.length, 2);
   assert.ok(!html.includes('</script><script>alert(1)'));
-  assert.ok(html.includes('&lt;/script&gt;'));
+  assert.ok(!json.includes('<'));
+  assert.ok(data[0].rows.some(row => row.subject === 'feature </script><script>alert(1)</script>'));
+  assert.ok(!html.includes('__ORCA_GIT_LOG_DATA__'));
+  assert.ok(!html.includes('__ORCA_GIT_LOG_TITLE__'));
+  const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
+  assert.ok(template.includes('No data — run'));
+  assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
+  assert.deepEqual(layoutLanes([]), []);
+  for (const repo of data) assert.deepEqual(repo.rows, layoutLanes(repo.commits));
   for (const repo of data) for (let i = 0; i < repo.rows.length - 1; i++) {
     const row = repo.rows[i];
     assert.ok(row.parentsLanes.every(lane => lane >= 0));
@@ -61,7 +69,7 @@ try {
   }
   assert.ok((await collectRepos(root, { limit: 1 })).every(repo => repo.commits.length === 1));
   await assert.rejects(collectRepos(root, { limit: 0 }), /positive integer/);
-  assert.ok(renderHtml([], { title: '<test>' }).includes('<title>&lt;test&gt;</title>'));
+  assert.ok((await buildGitLogHtml(root, { title: '<test> $&' })).includes('<title>&lt;test&gt; $&amp;</title>'));
 
   // Exercise enclosing-parent pins for recursive modules before deinitializing.
   const checkedSub = join(root, 'libs/sub module');
