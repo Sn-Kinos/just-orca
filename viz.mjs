@@ -32,11 +32,11 @@ export async function collectRepos(rootPath, { limit = 500, refs = {} } = {}) {
         .filter(([, full]) => full !== 'refs/remotes/origin/HEAD').map(([short]) => short);
       const selected = Array.isArray(refs[name]) ? [...new Set(refs[name].filter(ref => repo.branches.includes(ref)))] : [];
       repo.selectedRefs = selected.length ? selected : null;
-      const log = await git(path, 'log', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s',
+      const log = await git(path, 'log', '-z', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1f%b',
         ...(repo.selectedRefs ? ['--end-of-options', ...repo.selectedRefs] : ['--all']), '--');
-      repo.commits = log.split('\n').filter(Boolean).map(line => {
-        const [sha, parents, author, ts, refs, ...subject] = line.split('\x1f');
-        return { sha, parents: parents ? parents.split(' ') : [], author, ts: Number(ts), refs: refs ? refs.split(', ').map(ref => ref.replace(/^HEAD -> /, '')) : [], subject: subject.join('\x1f') };
+      repo.commits = log.split('\0').filter(Boolean).map(record => {
+        const [sha, parents, author, ts, refs, subject, ...body] = record.split('\x1f');
+        return { sha, parents: parents ? parents.split(' ') : [], author, ts: Number(ts), refs: refs ? refs.split(', ').map(ref => ref.replace(/^HEAD -> /, '')) : [], subject, body: body.join('\x1f').trimEnd() };
       });
       try { repo.head = (await git(path, 'rev-parse', '--verify', 'HEAD')).trim(); }
       catch { if (repo.commits.length) throw new Error('Cannot resolve repository HEAD'); }

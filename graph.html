@@ -33,23 +33,36 @@ main{min-width:0}
 section{margin-bottom:16px;border:1px solid var(--line);border-radius:6px}
 summary{padding:12px;cursor:pointer;font-weight:600}
 .history{overflow-x:auto;padding:0 12px 12px}
-.row{display:flex;height:36px;min-width:max-content;align-items:center}
+.row{display:flex;height:36px;align-items:center;cursor:pointer}
 .row svg{flex-shrink:0}
-.text{display:flex;align-items:center;gap:8px;flex:1;height:100%;white-space:nowrap}
-.row.filtered .text{opacity:.15}
+.text{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;white-space:nowrap}
+.row.filtered .text,.row.filtered + .detail .detail-content{opacity:.15}
 .pinned{background:var(--pin)}
+.badges{flex-shrink:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badges:empty{display:none}
 .badge{background:var(--badge);border-radius:4px;padding:2px 5px;font-size:12px}
 .head{color:#b56be3}
 .branch{border-left:3px solid #3b82f6}
 .tag{border-left:3px solid #e87924}
 .pin{font-weight:600}
-.subject{min-width:220px;flex:1}
-.author,time{color:var(--muted);font-size:12px}
+.subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.author,time{flex-shrink:0;color:var(--muted);font-size:12px}
 .author{margin-left:20px}
-time{width:105px;text-align:right}
-.sha{border:0;background:none;color:var(--fg);font:12px monospace;cursor:pointer;padding:4px}
+time{text-align:right}
+.sha{flex-shrink:0;border:0;background:none;color:var(--fg);font:12px monospace;cursor:pointer;padding:4px}
 .sha:hover{text-decoration:underline}
-button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+.detail{display:flex;align-items:stretch}
+.detail[hidden]{display:none}
+.detail-graph{position:relative;flex-shrink:0}
+.detail-graph svg{position:absolute;inset:0}
+.detail-content{flex:1;min-width:0;padding:8px 4px 16px;overflow-wrap:anywhere}
+.detail-subject{font-weight:600}
+.detail-body{white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace}
+.detail dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:12px 0 0}
+.detail dt{color:var(--muted)}
+.detail dd{margin:0}
+.detail .sha{text-align:left;overflow-wrap:anywhere}
+button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
 #status{margin-left:12px;font-size:12px}
 
 </style>
@@ -91,20 +104,42 @@ function LaneGraph(row) {
     <circle cx="${x(row.lane)}" cy="18" r="4" fill="${colors[row.lane % 8]}"/>`;
 }
 
+function ShaButton(sha, full = false) {
+  return `<button class="sha" data-copy="${escape(sha)}" title="Copy full commit SHA">${escape(full ? sha : sha.slice(0, 8))}</button>`;
+}
+
+function CommitDetail(row, lanesWidth) {
+  const date = new Date(row.ts * 1000).toISOString();
+  const lines = row.edges.map(edge => `<line x1="${16 + edge.to * 20}" x2="${16 + edge.to * 20}" y1="0" y2="100%" stroke="${colors[edge.from % 8]}"/>`).join('');
+  return `<div class="detail" hidden>
+    <div class="detail-graph" style="width:${lanesWidth}px"><svg width="${lanesWidth}" height="100%" aria-hidden="true" stroke-width="2">${lines}</svg></div>
+    <div class="detail-content">
+      <div class="detail-subject">${escape(row.subject)}</div>
+      ${row.body ? `<pre class="detail-body">${escape(row.body)}</pre>` : ''}
+      <dl>
+        <dt>SHA</dt><dd>${ShaButton(row.sha, true)}</dd>
+        <dt>Parents</dt><dd>${row.parents.map(sha => ShaButton(sha)).join(' ') || 'None'}</dd>
+        <dt>Author</dt><dd>${escape(row.author)}</dd>
+        <dt>Date</dt><dd><time datetime="${date}">${date}</time></dd>
+        <dt>Refs</dt><dd>${row.refs.map(RefBadge).join(' ') || 'None'}</dd>
+      </dl>
+    </div>
+  </div>`;
+}
+
 function CommitRow(row, lanesWidth) {
   const date = new Date(row.ts * 1000).toISOString();
-  return `<div class="row${row.pinned ? ' pinned' : ''}" data-sha="${escape(row.sha)}"
+  return `<div class="commit"><div class="row${row.pinned ? ' pinned' : ''}" role="button" tabindex="0" aria-expanded="false" data-sha="${escape(row.sha)}"
       data-parent-lanes="${row.parentsLanes.join(',')}" data-search="${escape(`${row.sha} ${row.author} ${row.subject}`.toLowerCase())}">
     <svg width="${lanesWidth}" height="36" aria-hidden="true" fill="none" stroke-width="2">${LaneGraph(row)}</svg>
     <div class="text">
-      <button class="sha" data-copy="${escape(row.sha)}" title="Copy full commit SHA">${escape(row.sha.slice(0, 8))}</button>
-      ${row.refs.map(RefBadge).join('')}
-      ${row.pinned ? '<span class="badge pin">superproject HEAD</span>' : ''}
-      <span class="subject">${escape(row.subject)}</span>
+      ${ShaButton(row.sha)}
+      <span class="badges">${row.refs.map(RefBadge).join(' ')}${row.pinned ? ' <span class="badge pin">superproject HEAD</span>' : ''}</span>
+      <span class="subject" title="${escape(row.subject)}">${escape(row.subject)}</span>
       <span class="author">${escape(row.author)}</span>
       <time data-ts="${row.ts}" title="${date}">${date.slice(0, 10)}</time>
     </div>
-  </div>`;
+  </div>${CommitDetail(row, lanesWidth)}</div>`;
 }
 
 function RepoSection(repo) {
@@ -204,7 +239,7 @@ async function start() {
       document.querySelector('main').innerHTML = render(repos, selection);
       Filter();
       const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-      for (const time of document.querySelectorAll('time')) {
+      for (const time of document.querySelectorAll('time[data-ts]')) {
         const seconds = Number(time.dataset.ts) - Date.now() / 1000;
         const [unit, size] = Math.abs(seconds) >= 86400 ? ['day',86400] : Math.abs(seconds) >= 3600 ? ['hour',3600] : ['minute',60];
         time.textContent = relative.format(Math.round(seconds / size), unit);
@@ -260,9 +295,25 @@ async function start() {
 }
 start();
 
+function toggleCommit(row) {
+  const expanded = row.getAttribute('aria-expanded') !== 'true';
+  row.setAttribute('aria-expanded', String(expanded));
+  row.nextElementSibling.hidden = !expanded;
+}
+
+document.addEventListener('keydown', event => {
+  if (!event.target.matches('.row') || !['Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  if (!event.repeat) toggleCommit(event.target);
+});
+
 document.addEventListener('click', async event => {
   const button = event.target.closest('[data-copy]');
-  if (!button) return;
+  if (!button) {
+    const row = event.target.closest('.row');
+    if (row) toggleCommit(row);
+    return;
+  }
   const status = document.querySelector('#status');
   try {
     await navigator.clipboard.writeText(button.dataset.copy);

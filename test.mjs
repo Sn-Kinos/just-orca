@@ -37,7 +37,7 @@ try {
   await git(root, 'checkout', 'main');
   await writeFile(join(root, 'main'), 'main');
   await git(root, 'add', '.');
-  await git(root, 'commit', '-m', 'main second');
+  await git(root, 'commit', '-m', 'main second', '-m', 'line1\nline2');
   await git(root, 'merge', '--no-ff', 'feature', '-m', 'merge feature');
   const merge = await git(root, 'rev-parse', 'HEAD');
   await git(root, '-c', 'protocol.file.allow=always', 'submodule', 'add', sub, 'libs/sub module');
@@ -61,10 +61,13 @@ try {
   assert.ok(!html.includes('</script><script>alert(1)'));
   assert.ok(!json.includes('<'));
   assert.ok(data[0].rows.some(row => row.subject === 'feature </script><script>alert(1)</script>'));
+  assert.equal(data[0].rows.find(row => row.subject === 'main second').body, 'line1\nline2');
+  assert.equal(data[0].rows.find(row => row.subject === 'root first').body, '');
   assert.ok(!html.includes('__ORCA_GIT_LOG_DATA__'));
   assert.ok(!html.includes('__ORCA_GIT_LOG_TITLE__'));
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
+  for (const text of ['class="commit"', 'class="detail" hidden', 'aria-expanded="false"', 'role="button" tabindex="0"', 'text-overflow:ellipsis', 'y2="100%"']) assert.ok(template.includes(text), text);
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
   new Script(template.match(/<script>\s*([\s\S]*?)<\/script>/)[1]);
   for (const text of ["fetch('/data' + location.search,", "'git-log-graph:' + location.search", 'function render(repos, selection)', 'type="checkbox"', 'data-select="all"', 'data-select="none"', 'location.reload()', 'Loading…', 'branch selection needs the live server']) assert.ok(template.includes(text), text);
