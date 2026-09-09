@@ -159,3 +159,31 @@ Replace steps 3–4 of the command handler:
 ### Tests (`test.mjs`)
 
 Add: start server in-process (`startServer({ stateFile: tmp, idleMs: 60000 })`), `POST /register` the temp superproject, `GET /data?repo=<id>` returns the same repo names/pinnedSha as `collectRepos`; unknown id → 404; `GET /?repo=<id>` returns HTML containing `id="repos"`; register a non-existent path → 400. Close the server at the end.
+
+## v0.3 — per-repo branch selection (2026-09-10)
+
+Requirement: for each repo (root and every submodule) choose which branches are shown.
+
+Server-side re-query, not client filtering: `--all -n 500` truncates, so filtering loaded commits by reachability would drop history that a narrower query would include.
+
+### Data (`viz.mjs`)
+
+- `collectRepos(root, { limit, refs })` — `refs` is `{ [repoName]: string[] }` (repoName as in `RepoGraph.name`, `.` for root). Each `RepoGraph` gains `branches: string[]` = `git for-each-ref --format=%(refname:short) refs/heads refs/remotes` (local first, then remote, `origin/HEAD` excluded) and `selectedRefs: string[] | null` (null = all).
+- When `refs[name]` is present and non-empty, run `git log --date-order -n <limit> <ref…> --` with only names that exist in `branches` (unknown names are dropped; if none remain fall back to `--all`). Otherwise `--all` as today. Never pass client strings that are not in `branches` to git.
+
+### Server (`serve.mjs`)
+
+- `POST /data?repo=<id>` with JSON body `{ limit?: number, refs?: { [repoName]: string[] } }` → same response shape as GET (`{ title, repos }`), repos now carrying `branches` and `selectedRefs`. `GET /data` stays (= all refs). Body cap 256 KiB, 400 on malformed JSON or non-string ref names.
+
+### UI (`graph.html`)
+
+- Sidebar: under each checked repo, a collapsed `<details>` "branches (n/m)" listing one checkbox per branch (local, then remote), plus per-repo All/None links. Unchecked repo → its branch list hidden.
+- Changing any branch checkbox re-fetches `/data` via POST with the current `refs` map (only repos whose selection is not "all" are sent) and re-renders; show "Loading…" in `#status` during the fetch, keep the old graph visible until the new data arrives.
+- Persist in `localStorage` (same key as before) as `{ repos: string[], refs: { [repoName]: string[] } }`; migrate the old plain-array format (treat as `repos`). On load, if saved `refs` exist, the first fetch already uses them.
+- File mode (embedded JSON, no server): branch lists are rendered disabled with a tooltip "branch selection needs the live server".
+- Section header shows `name · branch · N commits · refs: all|k selected`.
+
+### Tests (`test.mjs`)
+
+- `collectRepos(root, { refs: { '.': ['feature'] } })` returns only commits reachable from `feature` (no `main second`/merge), `branches` includes `main` and `feature`, `selectedRefs` equals `['feature']`; unknown ref names are ignored; `refs: { '.': ['nope'] }` falls back to all.
+- Server: `POST /data` with `{ refs: { '.': ['feature'] } }` matches `collectRepos` output; malformed body → 400.
