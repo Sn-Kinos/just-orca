@@ -84,6 +84,12 @@ try {
   assert.equal(nested[2].pinnedSha, subTip);
   await git(checkedSub, 'submodule', 'deinit', '-f', '--', 'nested');
   assert.ok((await collectRepos(root))[2].error.includes('uninitialized'));
+  // A stray gitlink (committed without .gitmodules) must be reported, not abort the whole scan.
+  await git(root, 'update-index', '--add', '--cacheinfo', `160000,${subTip},stray/link`);
+  await git(root, 'commit', '-m', 'stray gitlink');
+  const stray = (await collectRepos(root)).find(repo => repo.name === 'stray/link');
+  assert.ok(stray.error.includes('not registered'));
+  assert.deepEqual(stray.commits, []);
   await git(root, 'submodule', 'deinit', '-f', '--', 'libs/sub module');
   const uninitialized = await collectRepos(root);
   assert.equal(uninitialized[0].name, '.');

@@ -11,8 +11,10 @@ export async function collectRepos(rootPath, { limit = 500 } = {}) {
   const root = resolve(rootPath);
   await access(root).catch(() => { throw new Error(`Repository path not found: ${root}`); });
   const git = async (cwd, ...args) => (await promisify(execFile)('git', args, { cwd, maxBuffer: 64 * 1024 * 1024 })).stdout;
-  const names = ['.', ...(await git(root, 'submodule', 'foreach', '--recursive', '-q', 'echo "$displaypath"')).split('\n').filter(Boolean)];
+  // Discovered from gitlinks only: `submodule foreach --recursive` aborts on any stray gitlink missing from .gitmodules.
+  const names = ['.'];
   const pins = new Map();
+  const registered = new Set();
   const repos = [];
   for (const name of names) {
     const path = name === '.' ? root : resolve(root, name);
@@ -20,6 +22,7 @@ export async function collectRepos(rootPath, { limit = 500 } = {}) {
     repos.push(repo);
     try {
       if (name !== '.') {
+        if (!registered.has(name)) throw new Error('Gitlink is not registered in .gitmodules; skipped');
         try { await access(join(path, '.git')); }
         catch { throw new Error('Submodule is uninitialized (no .git); run git submodule update --init --recursive'); }
       }
@@ -31,12 +34,15 @@ export async function collectRepos(rootPath, { limit = 500 } = {}) {
       try { repo.head = (await git(path, 'rev-parse', '--verify', 'HEAD')).trim(); }
       catch { if (repo.commits.length) throw new Error('Cannot resolve repository HEAD'); }
       if (!repo.head) continue;
-      // foreach omits uninitialized modules; HEAD gitlinks supply their names and pins.
+      // -z: key and value separated by \n, entries by \0, so paths with spaces survive.
+      const modulePaths = new Set((await git(path, 'config', '-f', '.gitmodules', '-z', '--get-regexp', '^submodule\\..*\\.path$').catch(() => ''))
+        .split('\0').filter(Boolean).map(entry => entry.split('\n')[1]));
       for (const entry of (await git(path, 'ls-tree', '-r', '-z', 'HEAD')).split('\0')) {
         const match = /^160000 commit ([0-9a-f]+)\t([\s\S]+)$/.exec(entry);
         if (!match) continue;
         const child = name === '.' ? match[2] : `${name}/${match[2]}`;
         pins.set(child, match[1]);
+        if (modulePaths.has(match[2])) registered.add(child);
         if (!names.includes(child)) names.push(child);
       }
     } catch (error) {
