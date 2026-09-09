@@ -6,6 +6,7 @@ import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { Script } from 'node:vm';
 import { collectRepos, layoutLanes, buildGitLogHtml } from './viz.mjs';
 import { startServer } from './serve.mjs';
 
@@ -41,6 +42,7 @@ try {
   const merge = await git(root, 'rev-parse', 'HEAD');
   await git(root, '-c', 'protocol.file.allow=always', 'submodule', 'add', sub, 'libs/sub module');
   await git(join(root, 'libs/sub module'), 'checkout', pinned);
+  await git(join(root, 'libs/sub module'), 'branch', 'first', pinned);
   await git(root, 'add', '.');
   await git(root, 'commit', '-m', 'pin submodule');
 
@@ -64,7 +66,8 @@ try {
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
-  for (const text of ["fetch('/data' + location.search)", "'git-log-graph:' + location.search", 'function render(repos, selection)', 'type="checkbox"', 'data-select="all"', 'data-select="none"', 'location.reload()', 'Loading…']) assert.ok(template.includes(text), text);
+  new Script(template.match(/<script>\s*([\s\S]*?)<\/script>/)[1]);
+  for (const text of ["fetch('/data' + location.search,", "'git-log-graph:' + location.search", 'function render(repos, selection)', 'type="checkbox"', 'data-select="all"', 'data-select="none"', 'location.reload()', 'Loading…', 'branch selection needs the live server']) assert.ok(template.includes(text), text);
   assert.deepEqual(layoutLanes([]), []);
   for (const repo of data) assert.deepEqual(repo.rows, layoutLanes(repo.commits));
   for (const repo of data) for (let i = 0; i < repo.rows.length - 1; i++) {
@@ -75,6 +78,27 @@ try {
   assert.ok((await collectRepos(root, { limit: 1 })).every(repo => repo.commits.length === 1));
   await assert.rejects(collectRepos(root, { limit: 0 }), /positive integer/);
   assert.ok((await buildGitLogHtml(root, { title: '<test> $&' })).includes('<title>&lt;test&gt; $&amp;</title>'));
+
+  const allRepos = await collectRepos(root);
+  const featureRepos = await collectRepos(root, { refs: { '.': ['feature'] } });
+  assert.deepEqual(featureRepos[0].branches, ['feature', 'main']);
+  assert.deepEqual(featureRepos[0].selectedRefs, ['feature']);
+  assert.deepEqual(featureRepos[0].commits.map(commit => commit.sha), (await git(root, 'rev-list', '--date-order', 'feature', '--')).split('\n'));
+  assert.ok(!featureRepos[0].commits.some(commit => ['main second', 'merge feature'].includes(commit.subject)));
+  assert.deepEqual(featureRepos.slice(1), allRepos.slice(1), 'root refs do not filter submodules or their discovery');
+  assert.deepEqual(allRepos[1].branches, ['first', 'main', 'origin/main'], 'local branches precede remotes; origin/HEAD is excluded');
+  assert.ok(allRepos.every(repo => repo.selectedRefs === null));
+  assert.deepEqual(await collectRepos(root, { refs: { '.': ['feature', 'nope', '--max-count=1', merge, 'feature'] } }), featureRepos);
+  for (const refs of [['nope'], [], ['--max-count=1', merge]]) {
+    assert.deepEqual(await collectRepos(root, { refs: { '.': refs } }), allRepos);
+  }
+  const selectedSub = await collectRepos(root, { refs: { 'libs/sub module': ['first'] } });
+  assert.deepEqual(selectedSub[0], allRepos[0]);
+  assert.deepEqual(selectedSub[1].selectedRefs, ['first']);
+  assert.deepEqual(selectedSub[1].commits.map(commit => commit.sha), [pinned]);
+  assert.equal(selectedSub[1].pinnedSha, pinned);
+  const limitedFeature = await collectRepos(root, { limit: 1, refs: { '.': ['feature'] } });
+  assert.deepEqual(limitedFeature[0].commits, featureRepos[0].commits.slice(0, 1), 'limit applies after selecting refs');
 
   const stateFile = join(temp, 'server', 'state.json');
   server = await startServer({ stateFile, idleMs: 60000 });
@@ -106,6 +130,31 @@ try {
     title: `Git Log Graph — ${root}`,
     repos: (await collectRepos(root)).map(repo => ({ ...repo, rows: layoutLanes(repo.commits) }))
   });
+  const postData = body => request(`/data?repo=${id}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  const selectedResponse = await postData({ refs: { '.': ['feature'] } });
+  assert.equal(selectedResponse.status, 200);
+  assert.deepEqual(await selectedResponse.json(), {
+    title: `Git Log Graph — ${root}`,
+    repos: featureRepos.map(repo => ({ ...repo, rows: layoutLanes(repo.commits) }))
+  });
+  const postLimited = await (await postData({ limit: 1, refs: { '.': ['feature'] } })).json();
+  assert.deepEqual(postLimited.repos[0].commits, featureRepos[0].commits.slice(0, 1));
+  assert.ok((await (await postData({})).json()).repos.every(repo => repo.selectedRefs === null));
+  for (const body of [null, [], { refs: null }, { refs: [] }, { refs: 'feature' }, { refs: { '.': 'feature' } },
+    { refs: { '.': [42] } }, { refs: { unknown: [null] } }, { limit: 0 }, { limit: '1' }, { limit: null }]) {
+    const invalid = await postData(body);
+    assert.equal(invalid.status, 400, JSON.stringify(body));
+    assert.ok((await invalid.json()).error);
+  }
+  assert.equal((await request(`/data?repo=${id}`, { method: 'POST', body: '{' })).status, 400);
+  assert.equal((await request('/data?repo=unknown', { method: 'POST', body: '{}' })).status, 404);
+  const cappedBody = JSON.stringify({ padding: 'x'.repeat(256 * 1024 - 14) });
+  assert.equal(Buffer.byteLength(cappedBody), 256 * 1024);
+  assert.equal((await request(`/data?repo=${id}`, { method: 'POST', body: cappedBody })).status, 200);
+  assert.equal((await request(`/data?repo=${id}`, { method: 'POST', body: cappedBody + ' ' })).status, 400);
+  assert.equal((await postData({ padding: '한'.repeat(100 * 1024) })).status, 400, 'cap counts bytes, not characters');
   const limited = await (await request(`/data?repo=${id}&limit=1`)).json();
   assert.ok(limited.repos.every(repo => repo.commits.length === 1 && repo.rows.length === 1));
   for (const limit of ['0', '-1', '1.5', 'nope', '']) {
@@ -163,6 +212,8 @@ try {
   assert.ok(uninitialized[0].commits.length);
   assert.equal(uninitialized[1].pinnedSha, pinned);
   assert.deepEqual(uninitialized[1].commits, []);
+  assert.deepEqual(uninitialized[1].branches, []);
+  assert.equal(uninitialized[1].selectedRefs, null);
   assert.ok(uninitialized[1].error.includes('uninitialized'));
 
   server = await startServer({ stateFile, idleMs: 1000 });

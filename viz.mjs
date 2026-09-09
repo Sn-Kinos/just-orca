@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-export async function collectRepos(rootPath, { limit = 500 } = {}) {
+export async function collectRepos(rootPath, { limit = 500, refs = {} } = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('limit must be a positive integer');
   const root = resolve(rootPath);
   await access(root).catch(() => { throw new Error(`Repository path not found: ${root}`); });
@@ -18,7 +18,7 @@ export async function collectRepos(rootPath, { limit = 500 } = {}) {
   const repos = [];
   for (const name of names) {
     const path = name === '.' ? root : resolve(root, name);
-    const repo = { name, path, pinnedSha: pins.get(name) ?? null, head: '', commits: [] };
+    const repo = { name, path, pinnedSha: pins.get(name) ?? null, head: '', commits: [], branches: [], selectedRefs: null };
     repos.push(repo);
     try {
       if (name !== '.') {
@@ -26,7 +26,14 @@ export async function collectRepos(rootPath, { limit = 500 } = {}) {
         try { await access(join(path, '.git')); }
         catch { throw new Error('Submodule is uninitialized (no .git); run git submodule update --init --recursive'); }
       }
-      const log = await git(path, 'log', '--all', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s');
+      // Git can shorten origin/HEAD to just "origin", so exclude it by its full name.
+      repo.branches = (await git(path, 'for-each-ref', '--format=%(refname:short)%00%(refname)', 'refs/heads', 'refs/remotes'))
+        .split('\n').filter(Boolean).map(line => line.split('\0'))
+        .filter(([, full]) => full !== 'refs/remotes/origin/HEAD').map(([short]) => short);
+      const selected = Array.isArray(refs[name]) ? [...new Set(refs[name].filter(ref => repo.branches.includes(ref)))] : [];
+      repo.selectedRefs = selected.length ? selected : null;
+      const log = await git(path, 'log', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s',
+        ...(repo.selectedRefs ? ['--end-of-options', ...repo.selectedRefs] : ['--all']), '--');
       repo.commits = log.split('\n').filter(Boolean).map(line => {
         const [sha, parents, author, ts, refs, ...subject] = line.split('\x1f');
         return { sha, parents: parents ? parents.split(' ') : [], author, ts: Number(ts), refs: refs ? refs.split(', ').map(ref => ref.replace(/^HEAD -> /, '')) : [], subject: subject.join('\x1f') };

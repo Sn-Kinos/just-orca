@@ -34,6 +34,8 @@ Refreshing the browser tab reloads live Git data, including submodules. The serv
 
 For manual use, run `node serve.mjs [--state /path/to/server.json]`, POST JSON `{ "path": "/path/to/repo" }` to `/register`, and open `http://127.0.0.1:<port>/?repo=<returned-id>`. `GET /data?repo=<id>&limit=500` returns the title and repositories with prepared lane rows.
 
+Expand **branches (n/m)** below a checked repository to select local or remote branches. Each change fetches fresh history; repository and branch choices persist across reloads (including older saved repository selections). **All**, **None**, or selections with no valid branches use all refs. Branch controls are disabled in standalone file mode. The API also accepts `POST /data?repo=<id>` with `{ "limit": 500, "refs": { ".": ["main"] } }`; only names in each repository's `branches` list are passed to Git.
+
 ## Standalone
 
 ```sh

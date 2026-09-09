@@ -44,14 +44,35 @@ export async function startServer({ stateFile = DEFAULT_STATE_FILE, idleMs = 60 
         return send(200, { id });
       }
       const path = paths.get(url.searchParams.get('repo'));
-      if (request.method !== 'GET' || !path) return send(404, { error: 'Not found' });
-      if (url.pathname === '/') {
+      if (!path) return send(404, { error: 'Not found' });
+      if (request.method === 'GET' && url.pathname === '/') {
         return send(200, await readFile(new URL('./graph.html', import.meta.url), 'utf8'), 'text/html; charset=utf-8');
       }
-      if (url.pathname === '/data') {
-        const limit = Number(url.searchParams.get('limit') ?? 500);
+      if (['GET', 'POST'].includes(request.method) && url.pathname === '/data') {
+        let options = { limit: Number(url.searchParams.get('limit') ?? 500) };
+        if (request.method === 'POST') {
+          try {
+            let body = '';
+            let bytes = 0;
+            request.setEncoding('utf8');
+            for await (const chunk of request) {
+              bytes += Buffer.byteLength(chunk);
+              if (bytes <= 256 * 1024) body += chunk;
+            }
+            if (bytes > 256 * 1024) throw new Error('Data body is too large');
+            options = JSON.parse(body);
+            if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Expected a JSON object');
+            if (options.refs !== undefined && (!options.refs || typeof options.refs !== 'object' || Array.isArray(options.refs)
+              || !Object.values(options.refs).every(refs => Array.isArray(refs) && refs.every(ref => typeof ref === 'string')))) {
+              throw new Error('refs must map repository names to arrays of strings');
+            }
+          } catch (error) {
+            return send(400, { error: error.message });
+          }
+        }
+        const { limit = 500, refs } = options;
         if (!Number.isSafeInteger(limit) || limit < 1) return send(400, { error: 'limit must be a positive integer' });
-        const repos = (await collectRepos(path, { limit })).map(repo => ({ ...repo, rows: layoutLanes(repo.commits) }));
+        const repos = (await collectRepos(path, { limit, refs })).map(repo => ({ ...repo, rows: layoutLanes(repo.commits) }));
         return send(200, { title: `Git Log Graph — ${path}`, repos });
       }
       send(404, { error: 'Not found' });

@@ -23,6 +23,11 @@ aside h2{margin:0 0 12px;font-size:16px}
 #repo-list label{display:flex;align-items:baseline;gap:8px;padding:6px 0;overflow-wrap:anywhere;cursor:pointer}
 #repo-list input{flex-shrink:0}
 #repo-list small{color:var(--muted)}
+.branches{margin-left:22px}
+.branches summary{padding:6px 0;font-size:12px;font-weight:400}
+.branches fieldset{border:0;padding:0;margin:0;min-width:0}
+.branches button{padding:2px 6px;border:0;background:none;text-decoration:underline}
+.branches:has(fieldset:disabled) label,.branches button:disabled{cursor:default}
 main{min-width:0}
 @media(max-width:719px){.layout{grid-template-columns:minmax(0,1fr)}aside{position:static;max-height:240px}}
 section{margin-bottom:16px;border:1px solid var(--line);border-radius:6px}
@@ -113,14 +118,26 @@ function RepoSection(repo) {
     refs: [...(row.sha === repo.head ? ['HEAD'] : []), ...row.refs.filter(ref => ref !== 'HEAD')]
   }, lanesWidth)).join('\n');
   return `<section data-repo="${escape(repo.name)}"><details open>
-    <summary>${escape(repo.name)} · ${escape(branch)} · ${repo.commits.length} commits</summary>
+    <summary>${escape(repo.name)} · ${escape(branch)} · ${repo.commits.length} commits · refs: ${repo.selectedRefs ? repo.selectedRefs.length + ' selected' : 'all'}</summary>
     <div class="history">${repo.error ? `<p role="alert">${escape(repo.error)}</p>` : rows || '<p>No commits</p>'}</div>
   </details></section>`;
 }
 
-function Sidebar(repos, selection) {
-  return repos.map(repo => `<label><input type="checkbox" value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
-    <span>${escape(repo.name)} <small>· ${repo.commits.length} commits${repo.error ? ' · error' : ''}</small></span></label>`).join('\n');
+function BranchList(repo, refs, live, visible) {
+  const selected = new Set(Object.hasOwn(refs, repo.name) ? refs[repo.name] : repo.branches);
+  return `<details class="branches" data-branches="${escape(repo.name)}"${visible ? '' : ' hidden'}${live ? '' : ' title="branch selection needs the live server"'}>
+    <summary>branches (${repo.branches.filter(ref => selected.has(ref)).length}/${repo.branches.length})</summary>
+    <fieldset aria-label="${escape(repo.name)} branches"${live ? '' : ' disabled'}>
+      <button type="button" data-refs="all">All</button><button type="button" data-refs="none" title="No branches selected uses all refs">None</button>
+      ${repo.branches.map(ref => `<label><input type="checkbox" id="${escape(encodeURIComponent(JSON.stringify([repo.name, ref])))}" value="${escape(ref)}"${selected.has(ref) ? ' checked' : ''}><span>${escape(ref)}</span></label>`).join('\n')}
+    </fieldset>
+  </details>`;
+}
+
+function Sidebar(repos, selection, refs, live) {
+  return repos.map(repo => `<label><input type="checkbox" data-repo-select value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
+    <span>${escape(repo.name)} <small>· ${repo.commits.length} commits${repo.error ? ' · error' : ''}</small></span></label>
+    ${BranchList(repo, refs, live, selection.has(repo.name))}`).join('\n');
 }
 
 function render(repos, selection) {
@@ -133,13 +150,16 @@ function Filter() {
 }
 document.querySelector('#filter').addEventListener('input', Filter);
 
-async function loadData() {
+async function loadData(refs, post = false) {
   const data = document.querySelector('#repos').textContent.trim();
   if (data.startsWith('[')) return { title: document.title, repos: JSON.parse(data) };
-  document.title = 'Git Log Graph';
+  if (!post) document.title = 'Git Log Graph';
   if (location.protocol !== 'http:') return;
-  document.querySelector('main').textContent = 'Loading…';
-  const response = await fetch('/data' + location.search);
+  document.querySelector('#status').textContent = 'Loading…';
+  const response = await fetch('/data' + location.search, post || Object.keys(refs).length ? {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit: Number(new URLSearchParams(location.search).get('limit') ?? 500), refs })
+  } : undefined);
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Request failed: ' + response.status);
   if (typeof result.title !== 'string' || !Array.isArray(result.repos)) throw new Error('Invalid repository data');
@@ -147,25 +167,40 @@ async function loadData() {
 }
 
 async function start() {
+  const live = location.protocol === 'http:' && !document.querySelector('#repos').textContent.trim().startsWith('[');
   const refresh = document.querySelector('#refresh');
-  refresh.hidden = location.protocol !== 'http:';
+  refresh.hidden = !live;
   refresh.addEventListener('click', () => location.reload());
+  const key = 'git-log-graph:' + location.search;
+  let selection;
+  let refs = Object.create(null);
   try {
-    const data = await loadData();
+    let saved = JSON.parse(localStorage.getItem(key));
+    if (Array.isArray(saved)) saved = { repos: saved };
+    if (Array.isArray(saved?.repos) && saved.repos.every(name => typeof name === 'string')) selection = new Set(saved.repos);
+    if (saved?.refs && typeof saved.refs === 'object' && !Array.isArray(saved.refs)) {
+      Object.assign(refs, Object.fromEntries(Object.entries(saved.refs).filter(([, names]) => Array.isArray(names) && names.every(name => typeof name === 'string'))));
+    }
+  } catch {} // Storage may be unavailable in file mode.
+  try {
+    const data = await loadData(refs);
     if (!data) return;
-    const { title, repos } = data;
+    let { title, repos } = data;
     document.title = title;
     document.querySelector('h1').textContent = title;
-    const key = 'git-log-graph:' + location.search;
-    let selection = new Set(repos.map(repo => repo.name));
-    try {
-      const saved = JSON.parse(localStorage.getItem(key));
-      if (Array.isArray(saved) && saved.every(name => typeof name === 'string')) selection = new Set(saved);
-    } catch {} // Storage may be unavailable in file mode.
+    selection ??= new Set(repos.map(repo => repo.name));
+    if (!live) refs = Object.fromEntries(repos.filter(repo => repo.selectedRefs).map(repo => [repo.name, repo.selectedRefs]));
     const sidebar = document.querySelector('aside');
-    document.querySelector('#repo-list').innerHTML = Sidebar(repos, selection);
     sidebar.hidden = false;
+    function persist() {
+      try { localStorage.setItem(key, JSON.stringify({ repos: [...selection], refs })); } catch {}
+    }
     function update() {
+      const open = new Set([...sidebar.querySelectorAll('details[open]')].map(details => details.dataset.branches));
+      const focused = document.activeElement.id;
+      document.querySelector('#repo-list').innerHTML = Sidebar(repos, selection, refs, live);
+      sidebar.querySelectorAll('details').forEach(details => { details.open = open.has(details.dataset.branches); });
+      if (focused) document.getElementById(focused)?.focus();
       document.querySelector('main').innerHTML = render(repos, selection);
       Filter();
       const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
@@ -176,18 +211,48 @@ async function start() {
       }
     }
     function select() {
-      selection = new Set([...sidebar.querySelectorAll('input:checked')].map(input => input.value));
-      try { localStorage.setItem(key, JSON.stringify([...selection])); } catch {}
+      selection = new Set([...sidebar.querySelectorAll('[data-repo-select]:checked')].map(input => input.value));
+      persist();
       update();
     }
-    sidebar.addEventListener('change', select);
+    let request = 0;
+    async function selectBranches(details) {
+      const selected = [...details.querySelectorAll('input:checked')].map(input => input.value);
+      if (selected.length === details.querySelectorAll('input').length) delete refs[details.dataset.branches];
+      else refs[details.dataset.branches] = selected;
+      details.querySelector('summary').textContent = `branches (${selected.length}/${details.querySelectorAll('input').length})`;
+      persist();
+      const current = ++request;
+      try {
+        const data = await loadData(refs, true);
+        if (current !== request) return;
+        repos = data.repos;
+        update();
+        document.querySelector('#status').textContent = '';
+      } catch (error) {
+        if (current === request) document.querySelector('#status').textContent = error.message;
+      }
+    }
+    sidebar.addEventListener('change', event => {
+      if (event.target.matches('[data-repo-select]')) select();
+      else if (live && event.target.matches('.branches input')) selectBranches(event.target.closest('details'));
+    });
     sidebar.addEventListener('click', event => {
+      const branches = event.target.closest('[data-refs]');
+      if (branches && live) {
+        const details = branches.closest('details');
+        details.querySelectorAll('input').forEach(input => { input.checked = branches.dataset.refs === 'all'; });
+        selectBranches(details);
+        return;
+      }
       const button = event.target.closest('[data-select]');
       if (!button) return;
-      sidebar.querySelectorAll('input').forEach(input => { input.checked = button.dataset.select === 'all'; });
+      sidebar.querySelectorAll('[data-repo-select]').forEach(input => { input.checked = button.dataset.select === 'all'; });
       select();
     });
+    persist();
     update();
+    document.querySelector('#status').textContent = '';
   } catch (error) {
     document.querySelector('main').textContent = '';
     document.querySelector('#status').textContent = error.message;
