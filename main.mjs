@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
+import { DEFAULT_STATE_FILE } from './serve.mjs'
 
 const run = promisify(execFile)
 
@@ -55,8 +55,55 @@ export async function resolveWorktree(ctx, log = console.log) {
   return { worktreeId: id, worktreePath: path }
 }
 
-export async function openInOrca(file, worktreeId) {
-  const url = pathToFileURL(file).href
+export async function ensureServer() {
+  const healthyPort = async (timeout = 1000) => {
+    try {
+      const { port, pid } = JSON.parse(await readFile(DEFAULT_STATE_FILE, 'utf8'))
+      if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(pid)) return
+      const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(timeout) })
+      const health = await response.json()
+      if (response.ok && health.ok === true && health.pid === pid) return port
+    } catch {}
+  }
+  const port = await healthyPort()
+  if (port) return port
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./serve.mjs', import.meta.url))], {
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+  })
+  await new Promise((resolve, reject) => {
+    child.once('spawn', resolve)
+    child.once('error', reject)
+  })
+  child.unref()
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
+    const port = await healthyPort(Math.max(1, Math.min(1000, deadline - Date.now())))
+    if (port) return port
+    await delay(Math.max(0, Math.min(100, deadline - Date.now())))
+  }
+  throw new Error('Git Log Graph server did not become healthy within 5 seconds')
+}
+
+async function registerGraph(worktreePath) {
+  const port = await ensureServer()
+  const base = `http://127.0.0.1:${port}`
+  const registered = await fetch(`${base}/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: worktreePath })
+  })
+  const registration = await registered.json()
+  if (!registered.ok) throw new Error(registration.error)
+  const url = `${base}/?repo=${registration.id}`
+  const response = await fetch(`${base}/data?repo=${registration.id}`)
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error)
+  return { url, repos: data.repos.length }
+}
+
+export async function openInOrca(url, worktreeId) {
   const worktree = `id:${worktreeId}`
   // `tab list --worktree id:<x>` blocks ~8s when that worktree has no browser tab; `all` returns in ~0.15s.
   const { tabs } = await cli(['tab', 'list', '--worktree', 'all', '--json'])
@@ -73,16 +120,9 @@ export default function activate(orca) {
     try {
       const ctx = await orca.host.call('workspace.readContext')
       const { worktreeId, worktreePath } = await resolveWorktree(ctx, (message) => orca.log(message))
-      // Load on invocation so discovery and --dry-run work before the renderer is installed.
-      const { buildGitLogHtml } = await import('./viz.mjs')
-      const html = await buildGitLogHtml(worktreePath, { limit: 500 })
-      const directory = join(tmpdir(), 'orca-git-log-graph')
-      const file = join(directory, `${createHash('sha1').update(worktreePath).digest('hex')}.html`)
-      await mkdir(directory, { recursive: true })
-      await writeFile(file, html, 'utf8')
-      await openInOrca(file, worktreeId)
-      // The template renders one section per JSON repository, including uninitialized submodules.
-      return { ok: true, file, worktreePath, repos: JSON.parse(html.match(/<script id="repos" type="application\/json">([\s\S]*?)<\/script>/)[1]).length }
+      const { url, repos } = await registerGraph(worktreePath)
+      await openInOrca(url, worktreeId)
+      return { ok: true, url, worktreePath, repos }
     } catch (cause) {
       const error = cause instanceof Error ? cause.message : String(cause)
       try {
@@ -111,6 +151,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     assert.equal(resolved.worktreeId, first.worktreeId)
     assert.equal(resolved.worktreePath, first.worktreePath)
     console.log(resolved.worktreePath)
+    const { url, repos } = await registerGraph(resolved.worktreePath)
+    console.log(`${url}\n${repos} repos`)
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1
