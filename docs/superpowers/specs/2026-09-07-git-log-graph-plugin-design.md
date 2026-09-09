@@ -123,3 +123,39 @@ Plain `assert`, no framework. Cleans up temp dir.
 ## Out of scope (YAGNI)
 
 Sidebar panel (API cannot carry data), live refresh, diff viewing, non-macOS CLI resolution, >500 commits per repo, remote worktrees.
+
+## v0.2 — live data server + submodule sidebar (2026-09-10)
+
+Requirements: (1) with many submodules, pick which ones to show via a sidebar of checkboxes; (2) a browser refresh must show the latest git state.
+
+(2) cannot work over `file://` (a static page cannot run git), so the plugin serves the page from a tiny local HTTP server instead of writing a temp file. The CLI file mode (`node viz.mjs <repo>`) stays as a standalone fallback.
+
+### `serve.mjs` — local data server (zero deps, `node:http` only)
+
+- Start: `node serve.mjs [--state <file>]`. Listens on `127.0.0.1`, port `0` (OS-assigned). Writes `{ pid, port, startedAt }` to the state file (default `join(os.tmpdir(), 'orca-git-log-graph', 'server.json')`) once listening. Exits after 60 minutes without any request (`// ponytail:` fixed idle timeout). Never binds a non-loopback address.
+- Routes (all JSON unless noted, `Cache-Control: no-store`):
+  - `GET /health` → `{ ok: true, pid }`
+  - `POST /register` body `{ path }` → `{ id }` where `id = sha1(resolve(path))`. Stores `id → path` in memory. 404 for anything not registered. Path must exist (`fs.access`), else 400.
+  - `GET /?repo=<id>` → `graph.html` as `text/html` (template untouched: placeholders left as-is; the page fetches its data). 404 if id unknown.
+  - `GET /data?repo=<id>&limit=<n>` → `{ title, repos }` where `repos` = `collectRepos(path, { limit })` with `rows: layoutLanes(commits)` per repo (same shape as the embedded JSON). Each call re-runs git → refresh = fresh. 500 with `{ error }` on failure. Default limit 500.
+  - No CORS headers (other origins must not read repo data).
+- `export function startServer({ stateFile, idleMs })` returning `{ port, close }` so `test.mjs` can start it in-process on port 0 and hit it with `fetch`.
+
+### `graph.html` changes
+
+- Data source, in order: (a) embedded JSON in `#repos` (CLI file mode) → (b) if `location.protocol` is `http:`, `fetch('/data' + location.search)` → (c) otherwise "No data" message. While fetching show "Loading…"; on fetch error show the error text in `#status`.
+- Sidebar (left column, fixed width ~240px, scrollable; main content to the right): one checkbox per repo, root first, label = repo name plus commit count and an "error" marker when `repo.error` is set; "All" / "None" buttons. Unchecked repos hide their `<section>`. Selection persists in `localStorage` under key `git-log-graph:` + `location.search` (per repo id), so a refresh keeps the choice. Default: all checked. Layout: CSS grid `sidebar main`; on narrow widths (<720px) sidebar stacks above.
+- Add a "Refresh" button next to the filter that calls `location.reload()` (only shown in http mode).
+- Keep all existing components; render is a pure function of `(repos, selection)`.
+
+### `main.mjs` changes
+
+Replace steps 3–4 of the command handler:
+3. `ensureServer()`: read state file → `GET http://127.0.0.1:<port>/health` (1 s timeout). If unhealthy/missing: spawn `process.execPath serve.mjs` **detached** (`detached: true, stdio: 'ignore', unref()`, env `{ ...process.env, ELECTRON_RUN_AS_NODE: '1' }` — the worker's `execPath` is Orca's Electron binary, which runs as Node with that flag; under plain `node` it is just node) and poll the state file + `/health` up to 5 s. The server outlives the worker (Orca reaps idle workers after 5 min).
+4. `POST /register { path: worktreePath }` → `{ id }`; open `http://127.0.0.1:<port>/?repo=<id>` in the worktree's Orca browser tab: reuse an existing tab whose URL matches (`tab list --worktree all`, then `goto --page`), else `tab create`.
+- `--dry-run` additionally starts/reuses the server, registers the resolved path, fetches `/data` and prints the repo count.
+- Return `{ ok: true, url, worktreePath, repos }`.
+
+### Tests (`test.mjs`)
+
+Add: start server in-process (`startServer({ stateFile: tmp, idleMs: 60000 })`), `POST /register` the temp superproject, `GET /data?repo=<id>` returns the same repo names/pinnedSha as `collectRepos`; unknown id → 404; `GET /?repo=<id>` returns HTML containing `id="repos"`; register a non-existent path → 400. Close the server at the end.
