@@ -68,7 +68,7 @@ export async function buildGitLogHtml(rootPath, opts)               // collect +
 ```
 
 Collection:
-- Submodules: `git submodule foreach --recursive -q 'echo "$displaypath"'` from root → list; each entry becomes a RepoGraph. Uninitialized submodules (no `.git`) are listed with `commits: []` and an `error` string, not skipped silently.
+- Submodules: discovered by scanning `git ls-tree -r HEAD` gitlinks (mode 160000) per repo, recursively; `submodule foreach --recursive` is not used because it aborts when any nested repo has a gitlink missing from `.gitmodules`. Each gitlink becomes a RepoGraph. Gitlinks not registered in that repo's `.gitmodules` (read with `git config -f .gitmodules -z --get-regexp`) and uninitialized submodules (no `.git`) are listed with `commits: []` and an `error` string, not skipped silently.
 - Pinned sha per submodule: `git -C <parent> ls-tree HEAD <relpath>` (mode 160000). For nested submodules the parent is the enclosing submodule.
 - Log: `git log --all --date-order -n <limit> --format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s` parsed on `\x1f`. Refs from `%D` split on `, `, strip `HEAD -> `.
 - All git calls via `execFile('git', […], { cwd, maxBuffer: 64MB })`. Never shell-interpolate paths.
