@@ -187,3 +187,23 @@ Server-side re-query, not client filtering: `--all -n 500` truncates, so filteri
 
 - `collectRepos(root, { refs: { '.': ['feature'] } })` returns only commits reachable from `feature` (no `main second`/merge), `branches` includes `main` and `feature`, `selectedRefs` equals `['feature']`; unknown ref names are ignored; `refs: { '.': ['nope'] }` falls back to all.
 - Server: `POST /data` with `{ refs: { '.': ['feature'] } }` matches `collectRepos` output; malformed body → 400.
+
+## v0.4 — fixed-width rows, ellipsis, expandable commit detail (2026-09-10)
+
+Problem: `.row{min-width:max-content}` + `white-space:nowrap` lets a long subject push author/time off to the right, so columns misalign and the section scrolls horizontally.
+
+### Data (`viz.mjs`)
+
+- Add `body: string` to each commit. Use `git log -z` with format `%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1f%b`; records are `\0`-separated (bodies contain newlines), fields `\x1f`-separated. Trim trailing whitespace of `body`.
+
+### UI (`graph.html`)
+
+- Row fits the container: remove `min-width:max-content` from `.row`; `.text{min-width:0}`; `.subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}`; author/time `flex-shrink:0`; badges in a `.badges{flex-shrink:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}` wrapper. Only the graph SVG column has a fixed width. `.history` keeps `overflow-x:auto` only as a safety net; with normal content there must be no horizontal scrollbar.
+- Full subject in `title=` on `.subject`.
+- Expand/collapse: the row (`role="button"`, `tabindex="0"`, `aria-expanded`) toggles on click or Enter/Space, except clicks on the SHA copy button. Expanded state adds a `.detail` block directly under that row (inside a `.commit` wrapper that holds `.row` + `.detail`) with: full subject, body (`white-space:pre-wrap`, monospace-ish, empty → omitted), full SHA (copy button), parents as short-SHA copy buttons, author, absolute ISO date, refs badges. Multiple rows may be open at once. Expanded state is not persisted.
+- Lane continuity: the detail block has the same left column width as the graph column and draws a vertical line for every lane passing through between this row and the next: for each `edge` of the row, `<line x1=x(edge.to) x2=x(edge.to) y1=0 y2=100% stroke=colors[edge.from % 8]>` inside an SVG that stretches to the detail height (`height="100%"`, container `display:flex; align-items:stretch`). Verified visually: the graph must look unbroken when a row is expanded.
+- Filter continues to work on collapsed rows; an expanded row that no longer matches is dimmed like any other.
+
+### Tests (`test.mjs`)
+
+- Commit with a multi-line body (`-m subject -m "line1\nline2"`) → `body === 'line1\nline2'`; subject with `\x1f`/`\0`-free content unchanged; template contains `.detail` and `aria-expanded`.
