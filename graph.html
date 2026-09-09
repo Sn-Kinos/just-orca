@@ -13,7 +13,18 @@
 *{box-sizing:border-box}
 body{margin:24px;background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif}
 h1{font-size:22px}
-input{padding:9px;width:min(100%,480px);margin:8px 0 20px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
+#filter{padding:9px;width:min(100%,480px);border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 20px}
+.toolbar button,aside button{padding:8px 12px;border:1px solid var(--line);border-radius:5px;background:var(--badge);color:var(--fg);font:inherit;cursor:pointer}
+.layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px}
+aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
+aside h2{margin:0 0 12px;font-size:16px}
+#repo-list{margin-top:12px}
+#repo-list label{display:flex;align-items:baseline;gap:8px;padding:6px 0;overflow-wrap:anywhere;cursor:pointer}
+#repo-list input{flex-shrink:0}
+#repo-list small{color:var(--muted)}
+main{min-width:0}
+@media(max-width:719px){.layout{grid-template-columns:minmax(0,1fr)}aside{position:static;max-height:240px}}
 section{margin-bottom:16px;border:1px solid var(--line);border-radius:6px}
 summary{padding:12px;cursor:pointer;font-weight:600}
 .history{overflow-x:auto;padding:0 12px 12px}
@@ -40,10 +51,21 @@ button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid
 </head>
 <body>
 <h1>Git Log Graph</h1>
-<label for="filter">Filter commits</label><br>
+<label for="filter">Filter commits</label>
+<div class="toolbar">
 <input id="filter" type="search" placeholder="Author, subject or SHA">
+<button id="refresh" type="button" hidden>Refresh</button>
 <span id="status" role="status"></span>
+</div>
+<div class="layout">
+<aside aria-label="Repositories" hidden>
+  <h2>Repositories</h2>
+  <button type="button" data-select="all">All</button>
+  <button type="button" data-select="none">None</button>
+  <div id="repo-list"></div>
+</aside>
 <main><p>No data — run <code>node viz.mjs &lt;repo&gt;</code></p></main>
+</div>
 <script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>
 <script>
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -96,31 +118,83 @@ function RepoSection(repo) {
   </details></section>`;
 }
 
+function Sidebar(repos, selection) {
+  return repos.map(repo => `<label><input type="checkbox" value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
+    <span>${escape(repo.name)} <small>· ${repo.commits.length} commits${repo.error ? ' · error' : ''}</small></span></label>`).join('\n');
+}
+
+function render(repos, selection) {
+  return repos.filter(repo => selection.has(repo.name)).map(RepoSection).join('\n');
+}
+
 function Filter() {
-  const rows = [...document.querySelectorAll('.row')];
-  document.querySelector('#filter').addEventListener('input', event => {
-    const query = event.target.value.toLowerCase();
-    rows.forEach(row => row.classList.toggle('filtered', !row.dataset.search.includes(query)));
-  });
+  const query = document.querySelector('#filter').value.toLowerCase();
+  document.querySelectorAll('.row').forEach(row => row.classList.toggle('filtered', !row.dataset.search.includes(query)));
 }
+document.querySelector('#filter').addEventListener('input', Filter);
 
-// The untouched JSON comment leaves the friendly preview in place.
-const data = document.querySelector('#repos').textContent.trim();
-if (data.startsWith('[')) {
-  const repos = JSON.parse(data);
-  document.querySelector('h1').textContent = document.title;
-  document.querySelector('main').innerHTML = repos.map(RepoSection).join('\n');
-} else {
+async function loadData() {
+  const data = document.querySelector('#repos').textContent.trim();
+  if (data.startsWith('[')) return { title: document.title, repos: JSON.parse(data) };
   document.title = 'Git Log Graph';
+  if (location.protocol !== 'http:') return;
+  document.querySelector('main').textContent = 'Loading…';
+  const response = await fetch('/data' + location.search);
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Request failed: ' + response.status);
+  if (typeof result.title !== 'string' || !Array.isArray(result.repos)) throw new Error('Invalid repository data');
+  return result;
 }
-Filter();
 
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-for (const time of document.querySelectorAll('time')) {
-  const seconds = Number(time.dataset.ts) - Date.now() / 1000;
-  const [unit, size] = Math.abs(seconds) >= 86400 ? ['day',86400] : Math.abs(seconds) >= 3600 ? ['hour',3600] : ['minute',60];
-  time.textContent = relative.format(Math.round(seconds / size), unit);
+async function start() {
+  const refresh = document.querySelector('#refresh');
+  refresh.hidden = location.protocol !== 'http:';
+  refresh.addEventListener('click', () => location.reload());
+  try {
+    const data = await loadData();
+    if (!data) return;
+    const { title, repos } = data;
+    document.title = title;
+    document.querySelector('h1').textContent = title;
+    const key = 'git-log-graph:' + location.search;
+    let selection = new Set(repos.map(repo => repo.name));
+    try {
+      const saved = JSON.parse(localStorage.getItem(key));
+      if (Array.isArray(saved) && saved.every(name => typeof name === 'string')) selection = new Set(saved);
+    } catch {} // Storage may be unavailable in file mode.
+    const sidebar = document.querySelector('aside');
+    document.querySelector('#repo-list').innerHTML = Sidebar(repos, selection);
+    sidebar.hidden = false;
+    function update() {
+      document.querySelector('main').innerHTML = render(repos, selection);
+      Filter();
+      const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+      for (const time of document.querySelectorAll('time')) {
+        const seconds = Number(time.dataset.ts) - Date.now() / 1000;
+        const [unit, size] = Math.abs(seconds) >= 86400 ? ['day',86400] : Math.abs(seconds) >= 3600 ? ['hour',3600] : ['minute',60];
+        time.textContent = relative.format(Math.round(seconds / size), unit);
+      }
+    }
+    function select() {
+      selection = new Set([...sidebar.querySelectorAll('input:checked')].map(input => input.value));
+      try { localStorage.setItem(key, JSON.stringify([...selection])); } catch {}
+      update();
+    }
+    sidebar.addEventListener('change', select);
+    sidebar.addEventListener('click', event => {
+      const button = event.target.closest('[data-select]');
+      if (!button) return;
+      sidebar.querySelectorAll('input').forEach(input => { input.checked = button.dataset.select === 'all'; });
+      select();
+    });
+    update();
+  } catch (error) {
+    document.querySelector('main').textContent = '';
+    document.querySelector('#status').textContent = error.message;
+  }
 }
+start();
+
 document.addEventListener('click', async event => {
   const button = event.target.closest('[data-copy]');
   if (!button) return;
