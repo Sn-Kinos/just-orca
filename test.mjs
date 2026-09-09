@@ -64,6 +64,7 @@ try {
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
+  for (const text of ["fetch('/data' + location.search)", "'git-log-graph:' + location.search", 'function render(repos, selection)', 'type="checkbox"', 'data-select="all"', 'data-select="none"', 'location.reload()', 'Loading…']) assert.ok(template.includes(text), text);
   assert.deepEqual(layoutLanes([]), []);
   for (const repo of data) assert.deepEqual(repo.rows, layoutLanes(repo.commits));
   for (const repo of data) for (let i = 0; i < repo.rows.length - 1; i++) {
