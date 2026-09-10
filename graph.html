@@ -5,81 +5,135 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__ORCA_GIT_LOG_TITLE__</title>
 <style>
-:root{color-scheme:light dark;--bg:#fafafa;--fg:#20242c;--muted:#626976;--line:#dce0e6;--badge:#e5eaf1;--pin:#fff0c4}
-
-@media(prefers-color-scheme:dark){:root{--bg:#15181e;--fg:#e0e5ed;--muted:#a2abba;--line:#303744;--badge:#293242;--pin:#40371e}
-}
-
+:root{color-scheme:dark;--bg:#0f1216;--panel:#161b22;--panel-2:#1c2230;--line:#262d38;--fg:#e6e9ef;--muted:#8b95a5;--accent:#5b9cff;--pin:#f2b441;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f7f8fa;--panel:#ffffff;--panel-2:#f0f2f6;--line:#e3e7ee;--fg:#1b2230;--muted:#5f6b7c;--accent:#2f6fe4;--pin:#b7791f}}
 *{box-sizing:border-box}
-body{margin:24px;background:var(--bg);color:var(--fg);font:14px system-ui,sans-serif}
-h1{font-size:22px}
-#filter{padding:9px;width:min(100%,480px);border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
-.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 20px}
-.toolbar button,aside button{padding:8px 12px;border:1px solid var(--line);border-radius:5px;background:var(--badge);color:var(--fg);font:inherit;cursor:pointer}
-.layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px}
-aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
-aside h2{margin:0 0 12px;font-size:16px}
-#repo-list{margin-top:12px}
-#repo-list label{display:flex;align-items:baseline;gap:8px;padding:6px 0;overflow-wrap:anywhere;cursor:pointer}
-#repo-list input{flex-shrink:0}
-#repo-list small{color:var(--muted)}
-.branches{margin-left:22px}
-.branches summary{padding:6px 0;font-size:12px;font-weight:400}
-.branches fieldset{border:0;padding:0;margin:0;min-width:0}
-.branches button{padding:2px 6px;border:0;background:none;text-decoration:underline}
-.branches:has(fieldset:disabled) label,.branches button:disabled{cursor:default}
-main{min-width:0}
-@media(max-width:719px){.layout{grid-template-columns:minmax(0,1fr)}aside{position:static;max-height:240px}}
-section{margin-bottom:16px;border:1px solid var(--line);border-radius:6px}
-summary{padding:12px;cursor:pointer;font-weight:600}
-.history{overflow-x:auto;padding:0 12px 12px}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input{font:inherit;color:inherit}
+button,summary,label{cursor:pointer}
+button{border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:5px 8px}
+button:hover{background:var(--panel-2)}
+button:disabled,fieldset:disabled label{cursor:default}
+input[type=checkbox]{width:14px;height:14px;margin:0;flex-shrink:0;accent-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{position:sticky;top:0;z-index:2;height:48px;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.identity{display:flex;align-items:baseline;gap:12px;flex:1;min-width:0}
+h1{font-size:13px;font-weight:600;margin:0;flex-shrink:0;max-width:50%}
+h1,.repo-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.repo-path{min-width:0;color:var(--muted);font:12px var(--mono)}
+.toolbar{display:flex;align-items:center;gap:8px;min-width:0}
+#filter{width:clamp(180px,26vw,320px);min-width:0;height:28px;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--bg);font:12px var(--mono)}
+#filter::placeholder{color:var(--muted);opacity:1}
+#repo-toggle{display:none}
+#status{position:fixed;bottom:8px;right:12px;z-index:3;max-width:calc(100% - 24px);padding:4px 8px;background:var(--panel);overflow-wrap:anywhere;font:12px var(--mono)}
+#status:empty{display:none}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr)}
+aside{position:sticky;top:48px;align-self:start;height:calc(100dvh - 48px);overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px}
+.aside-bar{display:flex;align-items:center;justify-content:space-between;height:24px;margin-bottom:8px}
+h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;margin:0}
+.text-actions{display:flex;align-items:center;gap:3px;flex-shrink:0;color:var(--muted)}
+.text-actions button{border:0;background:none;padding:2px;font-size:11px;color:var(--muted)}
+.text-actions button:hover{color:var(--fg)}
+.repo-tree{list-style:none;margin:0;padding:0 0 0 8px}
+.repo-tree .repo-tree{padding-left:16px}
+.repo-node{position:relative;border-left:1px solid var(--line);min-width:0}
+.repo-node::before{content:"";position:absolute;top:12px;left:-4px;width:7px;height:7px;border-radius:50%;background:var(--repo-color)}
+.repo-row{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 12px}
+.repo-row::before{content:"";position:absolute;left:0;top:15px;width:8px;border-top:1px solid var(--line)}
+.repo-row:hover,.branch-row:hover,.branches summary:hover{background:var(--panel-2)}
+.repo-name,.branch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px var(--mono)}
+.root-tag{font-size:10px;color:var(--muted)}
+.count{margin-left:auto;color:var(--muted);font:12px var(--mono)}
+.error-tag{color:var(--pin);font-size:11px}
+.pin-note{display:flex;align-items:center;gap:6px;margin:0 0 2px 34px;height:20px;color:var(--muted);font:12px var(--mono);white-space:nowrap}
+.pin-note::before{content:"";width:5px;height:5px;flex-shrink:0;border-radius:50%;background:var(--muted)}
+.pin-note.changed::before{background:var(--pin)}
+.branches{margin-left:28px}
+summary{list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";display:inline-block;width:5px;height:5px;border:solid var(--muted);border-width:1px 1px 0 0;transform:rotate(45deg);flex-shrink:0}
+details[open]>summary::before{transform:rotate(135deg)}
+.branches summary{display:flex;align-items:center;gap:8px;height:28px;padding:0 6px;color:var(--muted);font:12px var(--mono)}
+.branches summary::before{transition:transform 120ms}
+.branches fieldset{border:0;padding:0 0 8px 6px;margin:0;min-width:0}
+.branch-group-bar{display:flex;align-items:center;justify-content:space-between;gap:6px;height:28px}
+.branch-group-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.branch-row{display:flex;align-items:center;gap:8px;height:28px;padding:0 4px}
+main{min-width:0;padding:12px}
+main>p,.history>p{padding:0 12px;color:var(--muted)}
+section{margin-bottom:12px;border:1px solid var(--line)}
+.section-bar{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;background:var(--panel-2);font:12px var(--mono);white-space:nowrap}
+.section-name{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600;letter-spacing:.01em}
+.section-bar .badge{color:var(--muted);min-width:0}
+.section-bar .count{margin-left:0}
+.history{overflow-x:auto;padding:0 8px}
 .row{display:flex;height:36px;align-items:center;cursor:pointer}
+.row:hover{background:var(--panel-2)}
 .row svg{flex-shrink:0}
+.row:focus-visible{outline-offset:-2px}
 .text{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;white-space:nowrap}
-.row.filtered .text,.row.filtered + .detail .detail-content{opacity:.15}
-.pinned{background:var(--pin)}
+.row.filtered .text,.row.filtered + .detail .detail-content{opacity:.25}
 .badges{flex-shrink:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badges:empty{display:none}
-.badge{background:var(--badge);border-radius:4px;padding:2px 5px;font-size:12px}
-.head{color:#b56be3}
-.branch{border-left:3px solid #3b82f6}
-.tag{border-left:3px solid #e87924}
-.pin{font-weight:600}
+.badge{display:inline-block;vertical-align:middle;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/16px var(--mono)}
+.head{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.tag{border-color:var(--pin)}
+.pin{background:var(--pin);border-color:var(--pin);color:#0f1216}
 .subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.author,time{flex-shrink:0;color:var(--muted);font-size:12px}
-.author{margin-left:20px}
-time{text-align:right}
-.sha{flex-shrink:0;border:0;background:none;color:var(--fg);font:12px monospace;cursor:pointer;padding:4px}
+.author{width:clamp(64px,10vw,128px);overflow:hidden;text-overflow:ellipsis}
+.author,time{flex-shrink:0;color:var(--muted)}
+time{width:88px;text-align:right;font:12px var(--mono)}
+.sha{flex-shrink:0;border:0;background:none;color:var(--fg);font:12px var(--mono);cursor:pointer;padding:4px}
 .sha:hover{text-decoration:underline}
-.detail{display:flex;align-items:stretch}
-.detail[hidden]{display:none}
+.detail{display:flex;align-items:stretch;background:var(--panel)}
 .detail-graph{position:relative;flex-shrink:0}
 .detail-graph svg{position:absolute;inset:0}
-.detail-content{flex:1;min-width:0;padding:8px 4px 16px;overflow-wrap:anywhere}
+.detail-content{flex:1;min-width:0;padding:12px 4px;border-block:1px solid var(--line);overflow-wrap:anywhere}
 .detail-subject{font-weight:600}
-.detail-body{white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace}
+.detail-body{white-space:pre-wrap;font:12px/1.5 var(--mono)}
 .detail dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:12px 0 0}
 .detail dt{color:var(--muted)}
-.detail dd{margin:0}
-.detail .sha{text-align:left;overflow-wrap:anywhere}
-button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
-#status{margin-left:12px;font-size:12px}
-
+.detail dd{margin:0;min-width:0}
+.detail .sha{text-align:left;overflow-wrap:anywhere;max-width:100%}
+.detail time{width:auto}
+.repo-path,.repo-name,.count,.pin-note,.branches,.badge,.sha,time{font-variant-numeric:tabular-nums}
+@media(max-width:719px){
+  header{gap:8px;padding:0 8px}
+  #repo-toggle:not([hidden]){display:block}
+  .identity{flex:0 1 auto}
+  h1{max-width:18vw;flex-shrink:1}
+  .repo-path{display:none}
+  .toolbar{flex:1}
+  #filter{width:100%}
+  .layout{grid-template-columns:minmax(0,1fr)}
+  aside{display:none;position:sticky;z-index:1;height:auto;max-height:40dvh;border-right:0;border-bottom:1px solid var(--line)}
+  aside.open{display:block}
+  main{padding:8px}
+  .author{display:none}
+  .text{gap:4px}
+  time{width:76px}
+}
+@media(max-width:419px){.row time{display:none}}
+@media(prefers-reduced-motion:reduce){.branches summary::before{transition:none}}
 </style>
 </head>
 <body>
-<h1>Git Log Graph</h1>
-<label for="filter">Filter commits</label>
-<div class="toolbar">
-<input id="filter" type="search" placeholder="Author, subject or SHA">
-<button id="refresh" type="button" hidden>Refresh</button>
+<header>
+  <button id="repo-toggle" type="button" aria-expanded="false" aria-controls="repositories" hidden>Repositories</button>
+  <div class="identity"><h1>Git Log Graph</h1><span class="repo-path"></span></div>
+  <div class="toolbar">
+    <input id="filter" type="search" aria-label="Filter commits" placeholder="filter: author, subject, sha">
+    <button id="refresh" type="button" hidden>Refresh</button>
+  </div>
+</header>
 <span id="status" role="status"></span>
-</div>
 <div class="layout">
-<aside aria-label="Repositories" hidden>
-  <h2>Repositories</h2>
-  <button type="button" data-select="all">All</button>
-  <button type="button" data-select="none">None</button>
+<aside id="repositories" aria-label="Repositories" hidden>
+  <div class="aside-bar">
+    <h2>Repositories</h2>
+    <div class="text-actions"><button type="button" data-select="all">all</button><span aria-hidden="true">·</span><button type="button" data-select="none">none</button></div>
+  </div>
   <div id="repo-list"></div>
 </aside>
 <main><p>No data — run <code>node viz.mjs &lt;repo&gt;</code></p></main>
@@ -87,11 +141,11 @@ button:focus-visible,summary:focus-visible,input:focus-visible,.row:focus-visibl
 <script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>
 <script>
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const colors = ['#3b82f6', '#e87924', '#16a085', '#b56be3', '#e0527b', '#9b9423', '#00a6b2', '#8d7768'];
+const colors = ['#5b9cff', '#f2994a', '#2ec4a6', '#b388ff', '#ff6b8a', '#c9c22f', '#23b5d3', '#a58b6f'];
 
 function RefBadge(ref) {
   const kind = ref === 'HEAD' ? 'head' : ref.startsWith('tag: ') ? 'tag' : 'branch';
-  return `<span class="badge ${kind}">${escape(ref)}</span>`;
+  return `<span class="badge ${kind}" title="${escape(ref)}">${escape(ref)}</span>`;
 }
 
 function LaneGraph(row) {
@@ -134,7 +188,7 @@ function CommitRow(row, lanesWidth) {
     <svg width="${lanesWidth}" height="36" aria-hidden="true" fill="none" stroke-width="2">${LaneGraph(row)}</svg>
     <div class="text">
       ${ShaButton(row.sha)}
-      <span class="badges">${row.refs.map(RefBadge).join(' ')}${row.pinned ? ' <span class="badge pin">superproject HEAD</span>' : ''}</span>
+      <span class="badges">${row.pinned ? '<span class="badge pin">pinned by superproject</span> ' : ''}${row.refs.map(RefBadge).join(' ')}</span>
       <span class="subject" title="${escape(row.subject)}">${escape(row.subject)}</span>
       <span class="author">${escape(row.author)}</span>
       <time data-ts="${row.ts}" title="${date}">${date.slice(0, 10)}</time>
@@ -144,7 +198,8 @@ function CommitRow(row, lanesWidth) {
 
 function RepoSection(repo) {
   const head = repo.commits.find(commit => commit.sha === repo.head);
-  const branch = head?.refs.find(ref => ref !== 'HEAD' && !ref.startsWith('tag: '))
+  const branch = head?.refs.find(ref => repo.branches.some(branch => branch.remote === null && branch.label === ref))
+    ?? head?.refs.find(ref => ref !== 'HEAD' && !ref.startsWith('tag: '))
     ?? (repo.head.slice(0, 8) || (repo.error ? 'unavailable' : 'unborn'));
   const lanesWidth = Math.max(1, ...repo.rows.map(row => row.width)) * 20 + 16;
   const rows = repo.rows.map(row => CommitRow({
@@ -153,26 +208,49 @@ function RepoSection(repo) {
     refs: [...(row.sha === repo.head ? ['HEAD'] : []), ...row.refs.filter(ref => ref !== 'HEAD')]
   }, lanesWidth)).join('\n');
   return `<section data-repo="${escape(repo.name)}"><details open>
-    <summary>${escape(repo.name)} · ${escape(branch)} · ${repo.commits.length} commits · refs: ${repo.selectedRefs ? repo.selectedRefs.length + ' selected' : 'all'}</summary>
+    <summary class="section-bar"><span class="section-name" title="${escape(repo.path)}">${escape(repo.basename)}</span>
+      <span class="badge" title="${escape(branch)}">${escape(branch)}</span><span class="badge count" title="Commits">${repo.commits.length}</span>
+      <span class="badge">${repo.selectedRefs ? `${repo.selectedRefs.length} of ${repo.branches.length} refs` : 'all refs'}</span></summary>
     <div class="history">${repo.error ? `<p role="alert">${escape(repo.error)}</p>` : rows || '<p>No commits</p>'}</div>
   </details></section>`;
 }
 
 function BranchList(repo, refs, live, visible) {
-  const selected = new Set(Object.hasOwn(refs, repo.name) ? refs[repo.name] : repo.branches);
+  const selected = new Set(Object.hasOwn(refs, repo.name) ? refs[repo.name] : repo.branches.map(branch => branch.name));
+  const groups = new Map();
+  for (const branch of repo.branches) {
+    const group = branch.remote === null ? 'local' : `remotes/${branch.remote}`;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(branch);
+  }
   return `<details class="branches" data-branches="${escape(repo.name)}"${visible ? '' : ' hidden'}${live ? '' : ' title="branch selection needs the live server"'}>
-    <summary>branches (${repo.branches.filter(ref => selected.has(ref)).length}/${repo.branches.length})</summary>
-    <fieldset aria-label="${escape(repo.name)} branches"${live ? '' : ' disabled'}>
-      <button type="button" data-refs="all">All</button><button type="button" data-refs="none" title="No branches selected uses all refs">None</button>
-      ${repo.branches.map(ref => `<label><input type="checkbox" id="${escape(encodeURIComponent(JSON.stringify([repo.name, ref])))}" value="${escape(ref)}"${selected.has(ref) ? ' checked' : ''}><span>${escape(ref)}</span></label>`).join('\n')}
-    </fieldset>
+    <summary id="branches-${escape(encodeURIComponent(repo.name))}">branches ${repo.branches.filter(branch => selected.has(branch.name)).length}/${repo.branches.length}</summary>
+    ${[...groups].map(([group, branches]) => `<fieldset aria-label="${escape(repo.name + ' ' + group)} branches"${live ? '' : ' disabled'}>
+      <div class="branch-group-bar"><span class="branch-group-name" title="${escape(group)}">${escape(group)}</span><div class="text-actions">
+        ${['all', 'none'].map(action => `<button type="button" id="group-${escape(encodeURIComponent(JSON.stringify([repo.name, group, action])))}" data-refs="${action}" aria-label="Select ${action} ${escape(group)} branches"${action === 'none' ? ' title="No branches selected uses all refs"' : ''}>${action}</button>`).join('<span aria-hidden="true">·</span>')}
+      </div></div>
+      ${branches.map(branch => `<label class="branch-row"><input type="checkbox" id="${escape(encodeURIComponent(JSON.stringify([repo.name, branch.name])))}" value="${escape(branch.name)}"${selected.has(branch.name) ? ' checked' : ''}><span class="branch-name" title="${escape(branch.label)}">${escape(branch.label)}</span></label>`).join('\n')}
+    </fieldset>`).join('\n')}
   </details>`;
 }
 
 function Sidebar(repos, selection, refs, live) {
-  return repos.map(repo => `<label><input type="checkbox" data-repo-select value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
-    <span>${escape(repo.name)} <small>· ${repo.commits.length} commits${repo.error ? ' · error' : ''}</small></span></label>
-    ${BranchList(repo, refs, live, selection.has(repo.name))}`).join('\n');
+  const children = new Map();
+  repos.forEach((repo, index) => {
+    if (!children.has(repo.parent)) children.set(repo.parent, []);
+    children.get(repo.parent).push({ repo, color: colors[index % colors.length] });
+  });
+  function tree(parent) {
+    return `<ul class="repo-tree">${(children.get(parent) ?? []).map(({ repo, color }) => `<li class="repo-node" style="--repo-color:${color}">
+      <label class="repo-row"><input type="checkbox" id="repo-${escape(encodeURIComponent(repo.name))}" data-repo-select value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
+        <span class="repo-name" title="${escape(repo.name === '.' ? repo.path : repo.name)}">${escape(repo.basename)}</span>${repo.parent === null ? '<span class="root-tag">root</span>' : ''}
+        ${repo.error ? `<span class="error-tag" title="${escape(repo.error)}">error</span>` : ''}<span class="count">${repo.commits.length}</span></label>
+      ${repo.pinnedSha ? `<div class="pin-note${repo.head && repo.head !== repo.pinnedSha ? ' changed' : ''}" title="${escape(repo.head ? (repo.head === repo.pinnedSha ? 'HEAD matches pin' : 'HEAD differs from pin') : 'HEAD unavailable')}">pinned ${escape(repo.pinnedSha.slice(0, 7))}</div>` : ''}
+      ${BranchList(repo, refs, live, selection.has(repo.name))}
+      ${children.has(repo.name) ? tree(repo.name) : ''}
+    </li>`).join('\n')}</ul>`;
+  }
+  return tree(null);
 }
 
 function render(repos, selection) {
@@ -222,11 +300,19 @@ async function start() {
     if (!data) return;
     let { title, repos } = data;
     document.title = title;
-    document.querySelector('h1').textContent = title;
+    document.querySelector('h1').textContent = repos[0].basename;
+    document.querySelector('h1').title = repos[0].basename;
+    document.querySelector('.repo-path').textContent = repos[0].path;
+    document.querySelector('.repo-path').title = repos[0].path;
     selection ??= new Set(repos.map(repo => repo.name));
     if (!live) refs = Object.fromEntries(repos.filter(repo => repo.selectedRefs).map(repo => [repo.name, repo.selectedRefs]));
     const sidebar = document.querySelector('aside');
     sidebar.hidden = false;
+    const repoToggle = document.querySelector('#repo-toggle');
+    repoToggle.hidden = false;
+    repoToggle.addEventListener('click', () => {
+      repoToggle.setAttribute('aria-expanded', String(sidebar.classList.toggle('open')));
+    });
     function persist() {
       try { localStorage.setItem(key, JSON.stringify({ repos: [...selection], refs })); } catch {}
     }
@@ -255,7 +341,7 @@ async function start() {
       const selected = [...details.querySelectorAll('input:checked')].map(input => input.value);
       if (selected.length === details.querySelectorAll('input').length) delete refs[details.dataset.branches];
       else refs[details.dataset.branches] = selected;
-      details.querySelector('summary').textContent = `branches (${selected.length}/${details.querySelectorAll('input').length})`;
+      details.querySelector('summary').textContent = `branches ${selected.length}/${details.querySelectorAll('input').length}`;
       persist();
       const current = ++request;
       try {
@@ -276,7 +362,7 @@ async function start() {
       const branches = event.target.closest('[data-refs]');
       if (branches && live) {
         const details = branches.closest('details');
-        details.querySelectorAll('input').forEach(input => { input.checked = branches.dataset.refs === 'all'; });
+        branches.closest('fieldset').querySelectorAll('input').forEach(input => { input.checked = branches.dataset.refs === 'all'; });
         selectBranches(details);
         return;
       }

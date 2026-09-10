@@ -52,6 +52,10 @@ try {
   const shas = data.flatMap(repo => repo.rows.map(row => row.sha));
   for (const sha of [...(await git(root, 'rev-list', '--all')).split('\n'), pinned, subTip]) assert.ok(shas.includes(sha), sha);
   assert.deepEqual(data.map(repo => repo.name), ['.', 'libs/sub module']);
+  assert.equal(data[0].basename, 'super project');
+  assert.equal(data[0].parent, null);
+  assert.equal(data[1].basename, 'sub module');
+  assert.equal(data[1].parent, '.');
   const pinnedRow = data[1].rows.find(row => row.sha === data[1].pinnedSha);
   assert.equal(pinnedRow.sha, pinned);
   const mergeRow = data[0].rows.find(row => row.sha === merge);
@@ -69,7 +73,10 @@ try {
   assert.ok(template.includes('No data — run'));
   for (const text of ['class="commit"', 'class="detail" hidden', 'aria-expanded="false"', 'role="button" tabindex="0"', 'text-overflow:ellipsis', 'y2="100%"']) assert.ok(template.includes(text), text);
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
-  new Script(template.match(/<script>\s*([\s\S]*?)<\/script>/)[1]);
+  const script = template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
+  new Script(script);
+  const { BranchList, Sidebar, RepoSection } = new Script(script.slice(0, script.indexOf("document.querySelector('#filter').addEventListener"))
+    + ';({ BranchList, Sidebar, RepoSection })').runInNewContext();
   for (const text of ["fetch('/data' + location.search,", "'git-log-graph:' + location.search", 'function render(repos, selection)', 'type="checkbox"', 'data-select="all"', 'data-select="none"', 'location.reload()', 'Loading…', 'branch selection needs the live server']) assert.ok(template.includes(text), text);
   assert.deepEqual(layoutLanes([]), []);
   for (const repo of data) assert.deepEqual(repo.rows, layoutLanes(repo.commits));
@@ -84,12 +91,17 @@ try {
 
   const allRepos = await collectRepos(root);
   const featureRepos = await collectRepos(root, { refs: { '.': ['feature'] } });
-  assert.deepEqual(featureRepos[0].branches, ['feature', 'main']);
+  assert.deepEqual(featureRepos[0].branches, [
+    { name: 'feature', label: 'feature', remote: null }, { name: 'main', label: 'main', remote: null }
+  ]);
   assert.deepEqual(featureRepos[0].selectedRefs, ['feature']);
   assert.deepEqual(featureRepos[0].commits.map(commit => commit.sha), (await git(root, 'rev-list', '--date-order', 'feature', '--')).split('\n'));
   assert.ok(!featureRepos[0].commits.some(commit => ['main second', 'merge feature'].includes(commit.subject)));
   assert.deepEqual(featureRepos.slice(1), allRepos.slice(1), 'root refs do not filter submodules or their discovery');
-  assert.deepEqual(allRepos[1].branches, ['first', 'main', 'origin/main'], 'local branches precede remotes; origin/HEAD is excluded');
+  assert.deepEqual(allRepos[1].branches, [
+    { name: 'first', label: 'first', remote: null }, { name: 'main', label: 'main', remote: null },
+    { name: 'origin/main', label: 'origin/main', remote: 'origin' }
+  ], 'local branches precede remotes; origin/HEAD is excluded');
   assert.ok(allRepos.every(repo => repo.selectedRefs === null));
   assert.deepEqual(await collectRepos(root, { refs: { '.': ['feature', 'nope', '--max-count=1', merge, 'feature'] } }), featureRepos);
   for (const refs of [['nope'], [], ['--max-count=1', merge]]) {
@@ -190,6 +202,44 @@ try {
   await server.close();
   await assert.rejects(fetch(`${base}/health`));
 
+  // A remote called main makes the local branch's Git input "heads/main".
+  await git(root, 'remote', 'add', 'main', sub);
+  await git(root, 'update-ref', 'refs/remotes/main/main', merge);
+  await git(root, 'update-ref', 'refs/remotes/main/sherry-pos', merge);
+  await git(root, 'symbolic-ref', 'refs/remotes/main/HEAD', 'refs/remotes/main/main');
+  await git(root, 'update-ref', 'refs/remotes/zeta/topic', merge);
+  await git(root, 'symbolic-ref', 'refs/remotes/zeta/HEAD', 'refs/remotes/zeta/topic');
+  await git(root, 'tag', 'release', merge);
+  const [ambiguous] = await collectRepos(root);
+  assert.deepEqual(ambiguous.branches, [
+    { name: 'feature', label: 'feature', remote: null }, { name: 'heads/main', label: 'main', remote: null },
+    { name: 'main/main', label: 'main/main', remote: 'main' },
+    { name: 'main/sherry-pos', label: 'main/sherry-pos', remote: 'main' },
+    { name: 'zeta/topic', label: 'zeta/topic', remote: 'zeta' }
+  ]);
+  assert.equal(await git(root, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/main'), 'heads/main');
+  const refs = ambiguous.commits.flatMap(commit => commit.refs);
+  assert.ok(refs.includes('main'));
+  assert.ok(refs.includes('tag: release'));
+  assert.ok(!refs.some(ref => ref.startsWith('heads/') || ref.endsWith('/HEAD') || ref === 'zeta'));
+  const [selectedMain] = await collectRepos(root, { refs: { '.': ['heads/main', 'main/HEAD'] } });
+  assert.deepEqual(selectedMain.selectedRefs, ['heads/main']);
+  assert.deepEqual(selectedMain.commits.map(commit => commit.sha), (await git(root, 'rev-list', '--date-order', 'heads/main', '--')).split('\n'));
+  const picker = BranchList(ambiguous, { '.': ['heads/main'] }, true, true);
+  assert.ok(picker.includes('branches 1/5'));
+  for (const group of ['local', 'remotes/main', 'remotes/zeta']) assert.ok(picker.includes(`title="${group}">${group}</span>`));
+  assert.equal((picker.match(/<fieldset /g) ?? []).length, 3);
+  assert.equal((picker.match(/data-refs="all"/g) ?? []).length, 3);
+  assert.ok(picker.includes('value="heads/main" checked'));
+  assert.ok(picker.includes('title="main">main</span>'));
+  assert.ok(!picker.includes('>heads/main<') && !picker.includes('/HEAD'));
+  assert.ok(BranchList(ambiguous, {}, false, true).includes(' disabled'));
+  assert.ok(BranchList(ambiguous, {}, true, false).includes(' hidden'));
+  const section = RepoSection({ ...ambiguous, rows: layoutLanes(ambiguous.commits) });
+  assert.ok(section.includes('title="main">main</span>'));
+  assert.ok(!section.includes('>heads/main<') && !section.includes('/HEAD'));
+  assert.ok(RepoSection(data[1]).includes('pinned by superproject'));
+
   // Exercise enclosing-parent pins for recursive modules before deinitializing.
   const checkedSub = join(root, 'libs/sub module');
   await git(checkedSub, 'config', 'user.name', 'Graph Tester');
@@ -201,6 +251,14 @@ try {
   assert.deepEqual(nested.map(repo => repo.name), ['.', 'libs/sub module', 'libs/sub module/nested']);
   assert.equal(nested[1].pinnedSha, pinned);
   assert.equal(nested[2].pinnedSha, subTip);
+  assert.equal(nested[2].parent, 'libs/sub module');
+  assert.equal(nested[2].basename, 'nested');
+  const manifest = Sidebar(nested, new Set(nested.map(repo => repo.name)), {}, true);
+  assert.equal((manifest.match(/class="repo-node"/g) ?? []).length, 3);
+  assert.equal((manifest.match(/<ul class="repo-tree">/g) ?? []).length, 3);
+  assert.ok(manifest.includes('<span class="root-tag">root</span>'));
+  assert.ok(manifest.includes(`class="pin-note changed" title="HEAD differs from pin">pinned ${pinned.slice(0, 7)}`));
+  assert.ok(manifest.includes(`class="pin-note" title="HEAD matches pin">pinned ${subTip.slice(0, 7)}`));
   await git(checkedSub, 'submodule', 'deinit', '-f', '--', 'nested');
   assert.ok((await collectRepos(root))[2].error.includes('uninitialized'));
   // A stray gitlink (committed without .gitmodules) must be reported, not abort the whole scan.
@@ -209,6 +267,8 @@ try {
   const stray = (await collectRepos(root)).find(repo => repo.name === 'stray/link');
   assert.ok(stray.error.includes('not registered'));
   assert.deepEqual(stray.commits, []);
+  assert.equal(stray.basename, 'link');
+  assert.equal(stray.parent, '.');
   await git(root, 'submodule', 'deinit', '-f', '--', 'libs/sub module');
   const uninitialized = await collectRepos(root);
   assert.equal(uninitialized[0].name, '.');

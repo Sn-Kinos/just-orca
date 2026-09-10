@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -14,11 +14,12 @@ export async function collectRepos(rootPath, { limit = 500, refs = {} } = {}) {
   // Discovered from gitlinks only: `submodule foreach --recursive` aborts on any stray gitlink missing from .gitmodules.
   const names = ['.'];
   const pins = new Map();
+  const parents = new Map();
   const registered = new Set();
   const repos = [];
   for (const name of names) {
     const path = name === '.' ? root : resolve(root, name);
-    const repo = { name, path, pinnedSha: pins.get(name) ?? null, head: '', commits: [], branches: [], selectedRefs: null };
+    const repo = { name, basename: basename(path), parent: parents.get(name) ?? null, path, pinnedSha: pins.get(name) ?? null, head: '', commits: [], branches: [], selectedRefs: null };
     repos.push(repo);
     try {
       if (name !== '.') {
@@ -26,17 +27,21 @@ export async function collectRepos(rootPath, { limit = 500, refs = {} } = {}) {
         try { await access(join(path, '.git')); }
         catch { throw new Error('Submodule is uninitialized (no .git); run git submodule update --init --recursive'); }
       }
-      // Git can shorten origin/HEAD to just "origin", so exclude it by its full name.
-      repo.branches = (await git(path, 'for-each-ref', '--format=%(refname:short)%00%(refname)', 'refs/heads', 'refs/remotes'))
+      // Short names are Git inputs; full refs give unambiguous display labels and HEAD exclusion.
+      repo.branches = (await git(path, 'for-each-ref', '--sort=refname', '--format=%(refname:short)%00%(refname)', 'refs/heads', 'refs/remotes'))
         .split('\n').filter(Boolean).map(line => line.split('\0'))
-        .filter(([, full]) => full !== 'refs/remotes/origin/HEAD').map(([short]) => short);
-      const selected = Array.isArray(refs[name]) ? [...new Set(refs[name].filter(ref => repo.branches.includes(ref)))] : [];
+        .filter(([, full]) => !/^refs\/remotes\/.+\/HEAD$/.test(full))
+        .map(([name, full]) => ({ name, label: full.replace(/^refs\/(heads|remotes)\//, ''), remote: full.startsWith('refs/remotes/') ? full.split('/')[2] : null }));
+      const branchNames = new Set(repo.branches.map(branch => branch.name));
+      const selected = Array.isArray(refs[name]) ? [...new Set(refs[name].filter(ref => branchNames.has(ref)))] : [];
       repo.selectedRefs = selected.length ? selected : null;
-      const log = await git(path, 'log', '-z', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1f%b',
+      const log = await git(path, 'log', '-z', '--decorate=full', '--date-order', '-n', String(limit), '--format=%H%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1f%b',
         ...(repo.selectedRefs ? ['--end-of-options', ...repo.selectedRefs] : ['--all']), '--');
       repo.commits = log.split('\0').filter(Boolean).map(record => {
         const [sha, parents, author, ts, refs, subject, ...body] = record.split('\x1f');
-        return { sha, parents: parents ? parents.split(' ') : [], author, ts: Number(ts), refs: refs ? refs.split(', ').map(ref => ref.replace(/^HEAD -> /, '')) : [], subject, body: body.join('\x1f').trimEnd() };
+        return { sha, parents: parents ? parents.split(' ') : [], author, ts: Number(ts), refs: refs ? refs.split(', ')
+          .map(ref => ref.replace(/^HEAD -> /, '')).filter(ref => !/^refs\/remotes\/.+\/HEAD$/.test(ref))
+          .map(ref => ref.replace(/^refs\/(heads|remotes)\//, '').replace(/^tag: refs\/tags\//, 'tag: ')) : [], subject, body: body.join('\x1f').trimEnd() };
       });
       try { repo.head = (await git(path, 'rev-parse', '--verify', 'HEAD')).trim(); }
       catch { if (repo.commits.length) throw new Error('Cannot resolve repository HEAD'); }
@@ -49,6 +54,7 @@ export async function collectRepos(rootPath, { limit = 500, refs = {} } = {}) {
         if (!match) continue;
         const child = name === '.' ? match[2] : `${name}/${match[2]}`;
         pins.set(child, match[1]);
+        parents.set(child, name);
         if (modulePaths.has(match[2])) registered.add(child);
         if (!names.includes(child)) names.push(child);
       }
