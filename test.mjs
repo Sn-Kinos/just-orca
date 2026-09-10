@@ -72,6 +72,7 @@ try {
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
   for (const text of ['class="commit"', 'class="detail" hidden', 'aria-expanded="false"', 'role="button" tabindex="0"', 'text-overflow:ellipsis', 'y2="100%"']) assert.ok(template.includes(text), text);
+  for (const text of ['class="badge badge-more"', 'badges.slice(0, 3)', '+${badges.length - 3}', 'class="branch-count"', 'class="byline"']) assert.ok(template.includes(text), text);
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
   const script = template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   new Script(script);

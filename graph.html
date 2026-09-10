@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__ORCA_GIT_LOG_TITLE__</title>
 <style>
-:root{color-scheme:dark;--bg:#0f1216;--panel:#161b22;--panel-2:#1c2230;--line:#262d38;--fg:#e6e9ef;--muted:#8b95a5;--accent:#5b9cff;--pin:#f2b441;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
-@media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f7f8fa;--panel:#ffffff;--panel-2:#f0f2f6;--line:#e3e7ee;--fg:#1b2230;--muted:#5f6b7c;--accent:#2f6fe4;--pin:#b7791f}}
+:root{color-scheme:dark;--bg:#0f1216;--panel:#161b22;--panel-2:#1c2230;--line:#262d38;--fg:#e6e9ef;--muted:#a9b3c2;--accent:#5b9cff;--pin:#f2b441;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",sans-serif}
+@media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f7f8fa;--panel:#ffffff;--panel-2:#f0f2f6;--line:#e3e7ee;--fg:#1b2230;--muted:#55617a;--accent:#2f6fe4;--pin:#b7791f}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--fg);font:13px system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 var(--sans)}
 button,input{font:inherit;color:inherit}
 button,summary,label{cursor:pointer}
 button{border:1px solid var(--line);border-radius:3px;background:var(--panel);padding:5px 8px}
@@ -19,18 +19,18 @@ input[type=checkbox]{width:14px;height:14px;margin:0;flex-shrink:0;accent-color:
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 header{position:sticky;top:0;z-index:2;height:48px;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
 .identity{display:flex;align-items:baseline;gap:12px;flex:1;min-width:0}
-h1{font-size:13px;font-weight:600;margin:0;flex-shrink:0;max-width:50%}
+h1{font-size:15px;font-weight:600;margin:0;flex-shrink:0;max-width:50%}
 h1,.repo-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.repo-path{min-width:0;color:var(--muted);font:12px var(--mono)}
+.repo-path{min-width:0;color:var(--muted);font:12px/1.4 var(--mono)}
 .toolbar{display:flex;align-items:center;gap:8px;min-width:0}
-#filter{width:clamp(180px,26vw,320px);min-width:0;height:28px;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--bg);font:12px var(--mono)}
+#filter{width:clamp(180px,26vw,320px);min-width:0;height:28px;padding:4px 8px;border:1px solid var(--line);border-radius:3px;background:var(--bg);font-size:13px}
 #filter::placeholder{color:var(--muted);opacity:1}
 #repo-toggle{display:none}
-#status{position:fixed;bottom:8px;right:12px;z-index:3;max-width:calc(100% - 24px);padding:4px 8px;background:var(--panel);overflow-wrap:anywhere;font:12px var(--mono)}
+#status{position:fixed;bottom:8px;right:12px;z-index:3;max-width:calc(100% - 24px);padding:4px 8px;background:var(--panel);overflow-wrap:anywhere;font-size:12px}
 #status:empty{display:none}
-.layout{display:grid;grid-template-columns:260px minmax(0,1fr)}
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr)}
 aside{position:sticky;top:48px;align-self:start;height:calc(100dvh - 48px);overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px}
-.aside-bar{display:flex;align-items:center;justify-content:space-between;height:24px;margin-bottom:8px}
+.aside-bar{position:sticky;top:-12px;z-index:1;display:flex;align-items:center;justify-content:space-between;height:36px;margin-top:-12px;margin-bottom:8px;background:var(--panel)}
 h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;margin:0}
 .text-actions{display:flex;align-items:center;gap:3px;flex-shrink:0;color:var(--muted)}
 .text-actions button{border:0;background:none;padding:2px;font-size:11px;color:var(--muted)}
@@ -42,20 +42,24 @@ h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06
 .repo-row{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 12px}
 .repo-row::before{content:"";position:absolute;left:0;top:15px;width:8px;border-top:1px solid var(--line)}
 .repo-row:hover,.branch-row:hover,.branches summary:hover{background:var(--panel-2)}
-.repo-name,.branch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px var(--mono)}
+.repo-name,.branch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.repo-row:has(.root-tag) .repo-name{font-weight:600}
+.branch-name{font:13px/1.4 var(--mono)}
 .root-tag{font-size:10px;color:var(--muted)}
-.count{margin-left:auto;color:var(--muted);font:12px var(--mono)}
+.count{margin-left:auto;flex-shrink:0;color:var(--muted);font:13px/1.4 var(--mono)}
 .error-tag{color:var(--pin);font-size:11px}
-.pin-note{display:flex;align-items:center;gap:6px;margin:0 0 2px 34px;height:20px;color:var(--muted);font:12px var(--mono);white-space:nowrap}
+.pin-note{display:flex;align-items:center;gap:6px;color:var(--fg);font:12px/1.4 var(--mono);white-space:nowrap}
+.pin-note::after{content:"·";color:var(--muted)}
 .pin-note::before{content:"";width:5px;height:5px;flex-shrink:0;border-radius:50%;background:var(--muted)}
 .pin-note.changed::before{background:var(--pin)}
-.branches{margin-left:28px}
+.branches{margin-left:12px}
 summary{list-style:none}
 summary::-webkit-details-marker{display:none}
 summary::before{content:"";display:inline-block;width:5px;height:5px;border:solid var(--muted);border-width:1px 1px 0 0;transform:rotate(45deg);flex-shrink:0}
 details[open]>summary::before{transform:rotate(135deg)}
-.branches summary{display:flex;align-items:center;gap:8px;height:28px;padding:0 6px;color:var(--muted);font:12px var(--mono)}
-.branches summary::before{transition:transform 120ms}
+.branches summary{display:flex;align-items:center;gap:4px;height:24px;color:var(--muted);font-size:12px;white-space:nowrap}
+.branch-count{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.branches summary::before{order:1;margin-left:2px;transition:transform 120ms}
 .branches fieldset{border:0;padding:0 0 8px 6px;margin:0;min-width:0}
 .branch-group-bar{display:flex;align-items:center;justify-content:space-between;gap:6px;height:28px}
 .branch-group-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -63,41 +67,43 @@ details[open]>summary::before{transform:rotate(135deg)}
 main{min-width:0;padding:12px}
 main>p,.history>p{padding:0 12px;color:var(--muted)}
 section{margin-bottom:12px;border:1px solid var(--line)}
-.section-bar{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;background:var(--panel-2);font:12px var(--mono);white-space:nowrap}
-.section-name{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:600;letter-spacing:.01em}
-.section-bar .badge{color:var(--muted);min-width:0}
-.section-bar .count{margin-left:0}
+.section-bar{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;background:var(--panel-2);font:12px/1.4 var(--mono);white-space:nowrap}
+.section-name{min-width:0;overflow:hidden;text-overflow:ellipsis;font:600 14px/1.4 var(--sans);letter-spacing:.01em}
+.section-bar .badge{min-width:0}
+.section-bar .count{margin-left:0;font-size:12px;color:var(--fg)}
 .history{overflow-x:auto;padding:0 8px}
-.row{display:flex;height:36px;align-items:center;cursor:pointer}
+.row{display:flex;height:40px;align-items:center;cursor:pointer}
 .row:hover{background:var(--panel-2)}
 .row svg{flex-shrink:0}
 .row:focus-visible{outline-offset:-2px}
 .text{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;white-space:nowrap}
 .row.filtered .text,.row.filtered + .detail .detail-content{opacity:.25}
-.badges{flex-shrink:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badges{display:flex;gap:4px;flex:0 1 auto;min-width:0;max-width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badges:empty{display:none}
-.badge{display:inline-block;vertical-align:middle;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/16px var(--mono)}
+.badge{display:inline-block;vertical-align:middle;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/1.4 var(--mono)}
+.badge-more{flex-shrink:0}
 .head{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .tag{border-color:var(--pin)}
 .pin{background:var(--pin);border-color:var(--pin);color:#0f1216}
-.subject{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.author{width:clamp(64px,10vw,128px);overflow:hidden;text-overflow:ellipsis}
-.author,time{flex-shrink:0;color:var(--muted)}
-time{width:88px;text-align:right;font:12px var(--mono)}
-.sha{flex-shrink:0;border:0;background:none;color:var(--fg);font:12px var(--mono);cursor:pointer;padding:4px}
+.subject{flex:1;min-width:clamp(0px,calc(100% - 32ch),315px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.byline{display:flex;align-items:center;gap:8px;flex-shrink:0;max-width:20ch;font-size:13px}
+.author{min-width:0;max-width:10ch;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+time{flex-shrink:0;width:8ch;text-align:right;color:var(--muted);font:12px/1.4 var(--mono)}
+.sha{flex-shrink:0;border:0;background:none;color:var(--fg);font:13px/1.4 var(--mono);cursor:pointer;padding:4px}
+.row .sha{width:9ch}
 .sha:hover{text-decoration:underline}
 .detail{display:flex;align-items:stretch;background:var(--panel)}
 .detail-graph{position:relative;flex-shrink:0}
 .detail-graph svg{position:absolute;inset:0}
 .detail-content{flex:1;min-width:0;padding:12px 4px;border-block:1px solid var(--line);overflow-wrap:anywhere}
 .detail-subject{font-weight:600}
-.detail-body{white-space:pre-wrap;font:12px/1.5 var(--mono)}
+.detail-body{white-space:pre-wrap;font:inherit}
 .detail dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:12px 0 0}
 .detail dt{color:var(--muted)}
 .detail dd{margin:0;min-width:0}
 .detail .sha{text-align:left;overflow-wrap:anywhere;max-width:100%}
 .detail time{width:auto}
-.repo-path,.repo-name,.count,.pin-note,.branches,.badge,.sha,time{font-variant-numeric:tabular-nums}
+.repo-path,.branch-name,.count,.pin-note,.branches,.badge,.sha,time{font-variant-numeric:tabular-nums}
 @media(max-width:719px){
   header{gap:8px;padding:0 8px}
   #repo-toggle:not([hidden]){display:block}
@@ -112,7 +118,6 @@ time{width:88px;text-align:right;font:12px var(--mono)}
   main{padding:8px}
   .author{display:none}
   .text{gap:4px}
-  time{width:76px}
 }
 @media(max-width:419px){.row time{display:none}}
 @media(prefers-reduced-motion:reduce){.branches summary::before{transition:none}}
@@ -151,11 +156,11 @@ function RefBadge(ref) {
 function LaneGraph(row) {
   const x = lane => 16 + lane * 20;
   const paths = row.edges.map(edge =>
-    `<path stroke="${colors[edge.from % 8]}" d="M${x(edge.from)},${edge.top} C${x(edge.from)},27 ${x(edge.to)},27 ${x(edge.to)},36"/>`
+    `<path stroke="${colors[edge.from % 8]}" d="M${x(edge.from)},${edge.top * 40 / 36} C${x(edge.from)},30 ${x(edge.to)},30 ${x(edge.to)},40"/>`
   ).join('');
   return `${paths}
-    ${row.incoming ? `<path stroke="${colors[row.lane % 8]}" d="M${x(row.lane)},0 V18"/>` : ''}
-    <circle cx="${x(row.lane)}" cy="18" r="4" fill="${colors[row.lane % 8]}"/>`;
+    ${row.incoming ? `<path stroke="${colors[row.lane % 8]}" d="M${x(row.lane)},0 V20"/>` : ''}
+    <circle cx="${x(row.lane)}" cy="20" r="4" fill="${colors[row.lane % 8]}"/>`;
 }
 
 function ShaButton(sha, full = false) {
@@ -175,7 +180,7 @@ function CommitDetail(row, lanesWidth) {
         <dt>Parents</dt><dd>${row.parents.map(sha => ShaButton(sha)).join(' ') || 'None'}</dd>
         <dt>Author</dt><dd>${escape(row.author)}</dd>
         <dt>Date</dt><dd><time datetime="${date}">${date}</time></dd>
-        <dt>Refs</dt><dd>${row.refs.map(RefBadge).join(' ') || 'None'}</dd>
+        <dt>Refs</dt><dd>${row.pinned ? '<span class="badge pin">pinned by superproject</span> ' : ''}${row.refs.map(RefBadge).join(' ') || (row.pinned ? '' : 'None')}</dd>
       </dl>
     </div>
   </div>`;
@@ -183,15 +188,16 @@ function CommitDetail(row, lanesWidth) {
 
 function CommitRow(row, lanesWidth) {
   const date = new Date(row.ts * 1000).toISOString();
+  const badges = [...(row.pinned ? ['<span class="badge pin">pinned by superproject</span>'] : []), ...row.refs.map(RefBadge)];
   return `<div class="commit"><div class="row${row.pinned ? ' pinned' : ''}" role="button" tabindex="0" aria-expanded="false" data-sha="${escape(row.sha)}"
       data-parent-lanes="${row.parentsLanes.join(',')}" data-search="${escape(`${row.sha} ${row.author} ${row.subject}`.toLowerCase())}">
-    <svg width="${lanesWidth}" height="36" aria-hidden="true" fill="none" stroke-width="2">${LaneGraph(row)}</svg>
+    <svg width="${lanesWidth}" height="40" aria-hidden="true" fill="none" stroke-width="2">${LaneGraph(row)}</svg>
     <div class="text">
       ${ShaButton(row.sha)}
-      <span class="badges">${row.pinned ? '<span class="badge pin">pinned by superproject</span> ' : ''}${row.refs.map(RefBadge).join(' ')}</span>
+      <span class="badges">${badges.slice(0, 3).join(' ')}${badges.length > 3 ? `<span class="badge badge-more" title="Expand commit for all refs">+${badges.length - 3}</span>` : ''}</span>
       <span class="subject" title="${escape(row.subject)}">${escape(row.subject)}</span>
-      <span class="author">${escape(row.author)}</span>
-      <time data-ts="${row.ts}" title="${date}">${date.slice(0, 10)}</time>
+      <span class="byline"><span class="author" title="${escape(row.author)}">${escape(row.author)}</span>
+      <time data-ts="${row.ts}" title="${date}">${date.slice(0, 10)}</time></span>
     </div>
   </div>${CommitDetail(row, lanesWidth)}</div>`;
 }
@@ -224,7 +230,7 @@ function BranchList(repo, refs, live, visible) {
     groups.get(group).push(branch);
   }
   return `<details class="branches" data-branches="${escape(repo.name)}"${visible ? '' : ' hidden'}${live ? '' : ' title="branch selection needs the live server"'}>
-    <summary id="branches-${escape(encodeURIComponent(repo.name))}">branches ${repo.branches.filter(branch => selected.has(branch.name)).length}/${repo.branches.length}</summary>
+    <summary id="branches-${escape(encodeURIComponent(repo.name))}">${repo.pinnedSha ? `<span class="pin-note${repo.head && repo.head !== repo.pinnedSha ? ' changed' : ''}" title="${escape(repo.head ? (repo.head === repo.pinnedSha ? 'HEAD matches pin' : 'HEAD differs from pin') : 'HEAD unavailable')}">pinned ${escape(repo.pinnedSha.slice(0, 7))}</span>` : ''}<span class="branch-count">branches ${repo.branches.filter(branch => selected.has(branch.name)).length}/${repo.branches.length}</span></summary>
     ${[...groups].map(([group, branches]) => `<fieldset aria-label="${escape(repo.name + ' ' + group)} branches"${live ? '' : ' disabled'}>
       <div class="branch-group-bar"><span class="branch-group-name" title="${escape(group)}">${escape(group)}</span><div class="text-actions">
         ${['all', 'none'].map(action => `<button type="button" id="group-${escape(encodeURIComponent(JSON.stringify([repo.name, group, action])))}" data-refs="${action}" aria-label="Select ${action} ${escape(group)} branches"${action === 'none' ? ' title="No branches selected uses all refs"' : ''}>${action}</button>`).join('<span aria-hidden="true">·</span>')}
@@ -245,7 +251,6 @@ function Sidebar(repos, selection, refs, live) {
       <label class="repo-row"><input type="checkbox" id="repo-${escape(encodeURIComponent(repo.name))}" data-repo-select value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
         <span class="repo-name" title="${escape(repo.name === '.' ? repo.path : repo.name)}">${escape(repo.basename)}</span>${repo.parent === null ? '<span class="root-tag">root</span>' : ''}
         ${repo.error ? `<span class="error-tag" title="${escape(repo.error)}">error</span>` : ''}<span class="count">${repo.commits.length}</span></label>
-      ${repo.pinnedSha ? `<div class="pin-note${repo.head && repo.head !== repo.pinnedSha ? ' changed' : ''}" title="${escape(repo.head ? (repo.head === repo.pinnedSha ? 'HEAD matches pin' : 'HEAD differs from pin') : 'HEAD unavailable')}">pinned ${escape(repo.pinnedSha.slice(0, 7))}</div>` : ''}
       ${BranchList(repo, refs, live, selection.has(repo.name))}
       ${children.has(repo.name) ? tree(repo.name) : ''}
     </li>`).join('\n')}</ul>`;
@@ -341,7 +346,7 @@ async function start() {
       const selected = [...details.querySelectorAll('input:checked')].map(input => input.value);
       if (selected.length === details.querySelectorAll('input').length) delete refs[details.dataset.branches];
       else refs[details.dataset.branches] = selected;
-      details.querySelector('summary').textContent = `branches ${selected.length}/${details.querySelectorAll('input').length}`;
+      details.querySelector('.branch-count').textContent = `branches ${selected.length}/${details.querySelectorAll('input').length}`;
       persist();
       const current = ++request;
       try {
