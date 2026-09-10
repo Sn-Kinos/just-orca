@@ -7,12 +7,5 @@
   "metadata": {
     "description": "Community plugins for working with Orca."
   },
-  "plugins": [
-    {
-      "name": "orca",
-      "source": "./plugins/orca",
-      "description": "Operate Orca worktrees, terminals, and supervised agent workflows.",
-      "category": "development"
-    }
-  ]
+  "plugins": []
 }
