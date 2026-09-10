@@ -78,10 +78,10 @@ section{margin-bottom:12px;border:1px solid var(--line)}
 .row:focus-visible{outline-offset:-2px}
 .text{display:flex;align-items:center;gap:8px;flex:1;min-width:0;height:100%;white-space:nowrap}
 .row.filtered .text,.row.filtered + .detail .detail-content{opacity:.25}
-.badges{display:flex;gap:4px;flex:0 1 auto;min-width:0;max-width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badges{display:flex;gap:4px;flex:0 1 auto;min-width:0;max-width:45%;overflow:hidden;white-space:nowrap}
 .badges:empty{display:none}
-.badge{display:inline-block;vertical-align:middle;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/1.4 var(--mono)}
-.badge-more{flex-shrink:0}
+.badge{display:inline-block;vertical-align:middle;flex:0 1 auto;min-width:5ch;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/1.4 var(--mono)}
+.badge-more,.badge.head{flex-shrink:0;min-width:0}
 .head{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .tag{border-color:var(--pin)}
 .pin{background:var(--pin);border-color:var(--pin);color:#0f1216}
