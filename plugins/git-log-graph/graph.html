@@ -76,6 +76,9 @@ details[open]>summary::before{transform:rotate(135deg)}
 .branch-group-bar{display:flex;align-items:center;justify-content:space-between;gap:6px;height:28px}
 .branch-group-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .branch-row{display:flex;align-items:center;gap:8px;height:28px;padding:0 4px}
+.branch-row input[type=checkbox]{appearance:none;-webkit-appearance:none;width:12px;height:12px;border-radius:50%;border:2px solid var(--repo-color);background:var(--panel);cursor:pointer}
+.branch-row input[type=checkbox]:checked{background:var(--repo-color)}
+.branch-row input[type=checkbox]:disabled{opacity:.4;cursor:default}
 main{min-width:0;padding:12px}
 main>p,.history>p{padding:0 12px;color:var(--muted)}
 section{margin-bottom:12px;border:1px solid var(--line)}
