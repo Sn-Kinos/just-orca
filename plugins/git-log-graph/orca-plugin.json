@@ -5,6 +5,8 @@
   "name": "Git Log Graph",
   "version": "0.1.0",
   "description": "Commit graph of the focused worktree including all submodules, opened in an Orca browser tab.",
+  "author": { "name": "Sn-Kinos", "url": "https://github.com/Sn-Kinos" },
+  "repository": "https://github.com/Sn-Kinos/just-orca",
   "engines": { "orca": ">=1.4.0" },
   "pluginApi": 1,
   "main": "main.mjs",

@@ -1,66 +1,98 @@
-# Git Log Graph
+# Just Orca
 
-An Orca plugin that opens the focused worktree's commit graph, including recursive submodules, in an Orca browser tab. Requires Orca 1.4+, Git, and Node 20+. No npm dependencies or build step.
+[Orca](https://www.onorca.dev)를 위한 커뮤니티 플러그인 마켓플레이스입니다.
+지원 앱은 **플러그인별로** 정합니다. 각 앱의 카탈로그에는 그 앱에서 지원하는 플러그인만 등록합니다.
 
-## Files
+## 플러그인
 
-- `orca-plugin.json` — plugin manifest.
-- `main.mjs` — worker command and Orca tab integration.
-- `serve.mjs` — loopback HTTP server for the page and fresh Git data.
-- `viz.mjs` — Git collection, exported lane layout, JSON/template assembly, and CLI.
-- `graph.html` — self-contained UI with plain JavaScript components and inline styles.
-- `test.mjs` — runnable collection, lane, template, and server checks (`node test.mjs`).
+| 플러그인 | 기능 | 지원 앱 |
+| --- | --- | --- |
+| [orca](plugins/orca) | 워크트리·터미널·브라우저 조작, 에이전트 오케스트레이션 | Claude Code, Codex |
+| [git-log-graph](plugins/git-log-graph) | 워크트리와 모든 서브모듈의 커밋 그래프를 Orca 브라우저 탭에서 보기 (`⌘⌥L`) | Orca |
 
-Open `graph.html` directly to style the page; without injected data it shows “No data — run `node viz.mjs <repo>`”.
+`orca`에는 `orca-cli`, `orchestration` 스킬이 포함됩니다.
+설치된 Orca CLI의 `skills get` 명령으로 해당 버전의 사용 가이드를 읽습니다.
+Orca 앱과 CLI는 별도로 설치해야 합니다. [Orca 설치 안내](https://www.onorca.dev/docs/install)를 참고하세요.
 
-## Dev install
+## 설치
 
-1. Open Orca → **Settings → Plugins** (macOS: **⌘,**, then **Plugins / 플러그인** under Experimental). Turn on **Plugin system** if it is off.
-2. Expand **Development / 개발** below the catalog. Paste this checkout's absolute path into **Development plugin folder path**, then click **Add path**:
-   e.g. `/Users/Kinos/Projects/just-orca`.
-   This is the UI for **Dev plugin paths** (`devPluginPaths`).
-3. Select the **Installed** tab; click **Refresh** if needed. Find **Git Log Graph** (`kinos.git-log-graph`), review its permissions, approve `workspace:read`, `notifications:show`, and the Node worker trust disclosure, then enable it.
-4. Focus a local worktree and press **Mod+Alt+L** (**⌘⌥L** on macOS), or run **Git Log: Open Graph (with submodules)** from the command palette. Running it again reloads the existing graph tab.
+아래 GitHub 명령은 이 구성이 원격 레포에 푸시된 뒤 사용할 수 있습니다.
+설치 후 새 세션에서 플러그인을 사용하세요.
 
-The local profile stores the paths under `settings.devPluginPaths` in
-`~/Library/Application Support/orca/profiles/local-default/orca-data.json`.
-Use Settings while Orca is running so changes are persisted by the app.
+### Claude Code
 
-## Live server
+Claude Code 안에서 실행합니다.
 
-The plugin automatically starts or reuses `serve.mjs`, using only Node's built-in HTTP server. It listens on **127.0.0.1 only**, on an OS-assigned port. The page and `/data` responses use `Cache-Control: no-store`, with no CORS access. Only paths registered by the worker are available through repository IDs.
-
-Refreshing the browser tab reloads live Git data, including submodules. The server survives worker shutdown and exits after **60 minutes without a request**. Its `{ pid, port, startedAt }` state file is at `join(os.tmpdir(), 'orca-git-log-graph', 'server.json')` (`$TMPDIR/orca-git-log-graph/server.json` on macOS). The worker checks `/health` before reusing it and replaces stale state when starting a server.
-
-For manual use, run `node serve.mjs [--state /path/to/server.json]`, POST JSON `{ "path": "/path/to/repo" }` to `/register`, and open `http://127.0.0.1:<port>/?repo=<returned-id>`. `GET /data?repo=<id>&limit=500` returns the title and repositories with prepared lane rows.
-
-Expand **branches (n/m)** below a checked repository to select local or remote branches. Each change fetches fresh history; repository and branch choices persist across reloads (including older saved repository selections). **All**, **None**, or selections with no valid branches use all refs. Branch controls are disabled in standalone file mode. The API also accepts `POST /data?repo=<id>` with `{ "limit": 500, "refs": { ".": ["main"] } }`; only names in each repository's `branches` list are passed to Git.
-
-## Standalone
-
-```sh
-node viz.mjs /path/to/repo --limit 500 --out /tmp/g.html
-orca tab create --url file:///tmp/g.html --json
+```text
+/plugin marketplace add Sn-Kinos/just-orca
+/plugin install orca@just-orca
 ```
 
-Check CLI/worktree resolution and live data against the running Orca (does not open a tab):
+### Codex
+
+터미널에서 실행합니다.
 
 ```sh
-node main.mjs --dry-run
+codex plugin marketplace add Sn-Kinos/just-orca
+codex plugin add orca@just-orca
 ```
 
-This takes the first live Orca terminal, builds a context using its `handle`, asserts the resolved worktree id/path, starts or reuses the server, registers the path, fetches `/data`, and prints the path, URL, and repo count. Its `handle` match is synthetic; an actual plugin invocation logs whether `workspace.readContext` matched `handle` or `ptyId`.
+### Orca (앱 플러그인)
 
-## Dev-loop caveat
+`git-log-graph`는 Orca 앱 자체의 플러그인(`orca-plugin.json`)입니다. Orca의 마켓플레이스 형식은 플러그인이 git 레포 루트에 있어야 해서 이 레포의 하위 폴더는 직접 등록할 수 없습니다. 대신 로컬 경로로 설치합니다.
 
-Because the plugin contributes a keybinding, Orca folds the live tree hash of a dev plugin into its consent fingerprint: every file save flips the plugin to "needs re-approval" until you approve it again in Settings → Plugins. Installed (non-dev) copies do not have this problem.
+1. 이 레포를 클론합니다.
+2. Orca → **Settings → Plugins**에서 플러그인 시스템을 켭니다.
+3. **플러그인 설치 → 로컬 경로**에 `<클론 경로>/plugins/git-log-graph`를 지정하거나, 개발 중이면 **Development → 경로 추가**에 같은 경로를 넣습니다.
+4. 권한(`workspace:read`, `notifications:show`)을 검토하고 활성화합니다.
 
-If you keep a separate dev plugin copy to avoid re-approving every source edit, copy `orca-plugin.json`, `main.mjs`, `serve.mjs`, `viz.mjs`, and **`graph.html`** into that folder. Keep these files together; the CLI and server load the template relative to their modules. Restart the server after changing its code; refreshing the page reads the current `graph.html`.
+자세한 사용법은 [plugins/git-log-graph/README.md](plugins/git-log-graph/README.md)를 참고하세요.
 
-## Limits
+### 로컬 레포에서 설치
 
-- Default maximum: 500 commits per repository; standalone `--limit N` or the server's `/data?repo=<id>&limit=N` overrides it. No incremental loading.
-- Local worktrees only. Automatic packaged CLI discovery supports the macOS app layout, then falls back to `orca` on PATH.
-- Requires a matching terminal, or a unique display-name/branch match when there are no terminals.
-- Data updates on refresh, with no background polling or diff viewer. After an idle server exit, rerun the plugin command to reconnect.
-- Standalone `node viz.mjs` output remains a static snapshot. Without `--out`, generated HTML lives in the OS temporary directory under `orca-git-log-graph/<sha1-of-worktree-path>.html` and is not automatically removed.
+이 레포의 루트에서 사용할 앱의 명령을 실행합니다. 푸시하지 않은 변경도 확인할 수 있습니다.
+
+```sh
+# Claude Code
+claude plugin marketplace add .
+claude plugin install orca@just-orca
+
+# Codex
+codex plugin marketplace add .
+codex plugin add orca@just-orca
+```
+
+## 플러그인 추가
+
+1. `plugins/<플러그인명>/` 안에 스킬 등 플러그인 파일을 넣습니다.
+2. 지원하는 앱의 매니페스트만 만듭니다.
+   Claude Code는 `.claude-plugin/plugin.json`, Codex는 `.codex-plugin/plugin.json`을 사용합니다.
+   Orca 앱 플러그인은 `orca-plugin.json`을 사용하며, 카탈로그 없이 로컬 경로로 설치합니다.
+3. 해당 앱의 카탈로그에만 등록합니다. 두 앱을 모두 지원할 필요는 없습니다.
+4. 위 목록에 기능과 지원 앱을 적고, 각 지원 앱에서 설치를 확인합니다.
+
+| 앱 | 레포 루트의 카탈로그 | 플러그인 경로 형식 |
+| --- | --- | --- |
+| Claude Code | `.claude-plugin/marketplace.json` | `"source": "./plugins/<플러그인명>"` |
+| Codex | `.agents/plugins/marketplace.json` | `"source": {"source": "local", "path": "./plugins/<플러그인명>"}` |
+
+다른 앱을 지원하는 플러그인은 해당 앱의 배포 형식과 설치 방법을 함께 추가합니다.
+플러그인 이름은 폴더·매니페스트·카탈로그에서 동일하게 유지하고, 업데이트할 때 해당 플러그인의 매니페스트 버전을 올립니다.
+여러 앱을 지원하면 그 플러그인의 버전을 함께 올립니다.
+
+Claude Code 매니페스트와 스킬은 다음 명령으로 검사할 수 있습니다.
+
+```sh
+claude plugin validate .
+claude plugin validate plugins/orca
+```
+
+## 출처
+
+`orca`의 두 스킬은 [stablyai/orca의 공개 스킬](https://github.com/stablyai/orca/tree/4b4acf26a4775cfdde4258566683e41a6c276f5b/skills)을 그대로 포함합니다.
+원본의 MIT 라이선스는 [plugins/orca/LICENSE](plugins/orca/LICENSE)에 보존했습니다.
+이 레포는 Sn-Kinos가 관리하며 Orca 공식 마켓플레이스가 아닙니다.
+
+- [Orca 스킬과 버전별 가이드](https://www.onorca.dev/docs/cli/skills)
+- [Claude Code 마켓플레이스 형식](https://code.claude.com/docs/en/plugin-marketplaces)
+- [Codex 플러그인 안내](https://developers.openai.com/codex/plugins)

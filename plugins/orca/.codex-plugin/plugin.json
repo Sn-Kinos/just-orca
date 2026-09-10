@@ -1,0 +1,26 @@
+{
+  "name": "orca",
+  "version": "0.1.0",
+  "description": "Operate Orca worktrees, terminals, and supervised agent workflows.",
+  "author": {
+    "name": "Sn-Kinos",
+    "url": "https://github.com/Sn-Kinos"
+  },
+  "homepage": "https://github.com/Sn-Kinos/just-orca",
+  "repository": "https://github.com/Sn-Kinos/just-orca",
+  "license": "MIT",
+  "keywords": ["orca", "worktrees", "terminals", "orchestration"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Orca",
+    "shortDescription": "Manage Orca worktrees and agents.",
+    "longDescription": "Use Orca's CLI and orchestration skills with guides supplied by your installed Orca version. Requires Orca and its CLI.",
+    "developerName": "Sn-Kinos",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "Show my Orca worktrees and active terminals.",
+      "Coordinate a task across Orca workers."
+    ]
+  }
+}
