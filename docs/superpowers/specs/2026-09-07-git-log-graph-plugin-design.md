@@ -207,3 +207,51 @@ Problem: `.row{min-width:max-content}` + `white-space:nowrap` lets a long subjec
 ### Tests (`test.mjs`)
 
 - Commit with a multi-line body (`-m subject -m "line1\nline2"`) → `body === 'line1\nline2'`; subject with `\x1f`/`\0`-free content unchanged; template contains `.detail` and `aria-expanded`.
+
+## v0.5 — visual redesign of the page and sidebar (2026-09-10)
+
+Problem: the sidebar is a bare list of native checkboxes with no hierarchy; branch names wrap; refs show as `heads/main` / `main/HEAD`; the header is a huge H1 with a filesystem path.
+
+### Direction: an instrument panel for git
+
+- **Type**: identifiers (SHA, refs, branch names, counts, dates) in `ui-monospace, "SF Mono", Menlo, Consolas, monospace` 12px with `font-variant-numeric: tabular-nums`; prose (subjects, labels) in `system-ui, -apple-system, "Segoe UI", sans-serif` 13px. Section titles 13px semibold, letter-spacing 0.01em. No web fonts (must work offline over file://).
+- **Palette** (tokens on `:root`, dark first because Orca is dark; light under `prefers-color-scheme: light`):
+  - dark: `--bg #0f1216`, `--panel #161b22`, `--panel-2 #1c2230`, `--line #262d38`, `--fg #e6e9ef`, `--muted #8b95a5`, `--accent #5b9cff`, `--pin #f2b441`.
+  - light: `--bg #f7f8fa`, `--panel #ffffff`, `--panel-2 #f0f2f6`, `--line #e3e7ee`, `--fg #1b2230`, `--muted #5f6b7c`, `--accent #2f6fe4`, `--pin #b7791f`.
+  - lanes: `#5b9cff #f2994a #2ec4a6 #b388ff #ff6b8a #c9c22f #23b5d3 #a58b6f`.
+- **Signature**: the sidebar is a *manifest tree* that mirrors the graph: a thin vertical rail on the left, one colored dot per repository (root uses lane 0; submodules use lanes 1..n cycling), nested submodules indented under their parent along the rail. Under each submodule a one-line mono note `pinned 5b5a7d7` (first 7 of `pinnedSha`, amber dot when the submodule's HEAD differs from the pin, muted when equal). This is the one place the page spends its visual budget; everything else is quiet.
+
+### Layout
+
+```
+┌ header: [repo basename]  /full/path (mono, muted, truncates)     [search……] [Refresh] ┐
+├ aside 260px ────────────┬ main ─────────────────────────────────────────────────────┤
+│ REPOSITORIES  all·none  │ ▾ sherry-main  main  67  all refs            (section bar) │
+│ ●─ sherry-main    67    │  ● 89c900ee  ⟨main/…⟩ merge: main → 워크트리…   Sn-Kinos 4일 │
+│ │  branches 11/11 ▸     │ …                                                          │
+│ ├● sherry        102    │                                                            │
+│ │  pinned 5b5a7d7       │                                                            │
+│ ├● sherry-backend 500   │                                                            │
+│ │  branches 28/28 ▾     │                                                            │
+│ │   local  all·none     │                                                            │
+│ │   ☑ develop           │                                                            │
+│ │   remotes/origin      │                                                            │
+│ │   ☑ origin/develop    │                                                            │
+```
+- Header is a single 48px bar: repo basename (semibold) + full path (mono, muted, `text-overflow: ellipsis`), search input (mono placeholder `filter: author, subject, sha`) and Refresh (http mode only) on the right. `<title>` keeps the full title.
+- Aside: 260px, sticky, own scroll, `--panel` background, 1px `--line` right border. Root repo is labeled by the repo folder basename with a tiny `root` tag, not `.`. Each repo row: checkbox → name (mono, ellipsis, `title=` full name) → count right-aligned (mono, muted). Rows have 32px height and a hover background `--panel-2`.
+- Checkboxes: native inputs with `accent-color: var(--accent)`, 14px, aligned to the text baseline; no custom checkbox drawing.
+- Branch picker: a `branches k/m` toggle row (chevron rotates 90° when open; `transition: transform 120ms`, disabled under `prefers-reduced-motion`). When open: groups `local` and `remotes/<remote>` (one group per remote name) with a small `all · none` text-button pair per group; each branch row = checkbox + mono name single line with ellipsis and `title=`. Group headers 11px uppercase muted, letter-spacing 0.06em.
+- Section bar (per repo in main): 36px, `--panel-2` background, contents as mono chips: name (semibold), current branch, commit count, `all refs` or `k of m refs`. Chevron on the left toggles the section (keep `<details>`).
+- Row: unchanged structure; badges become chips: HEAD = filled `--accent` with `--bg` text; branch = 1px `--line` outline, mono; tag = amber outline; `pinned by superproject` = filled `--pin` with dark text. Row hover `--panel-2`. Expanded detail: `--panel` background, 1px `--line` top/bottom, same rail lines as v0.4.
+- Focus rings: 2px `--accent` on every interactive element. Filter dims to `opacity: .25`.
+- Responsive: under 720px the aside becomes a collapsible top panel (a `Repositories` toggle button in the header).
+
+### Data changes (`viz.mjs`)
+
+- `branches` becomes `Array<{ name, label, remote }>`: `name` = `%(refname:short)` (the exact value passed back to git), `label` = full ref minus `refs/heads/` or `refs/remotes/`, `remote` = remote name for `refs/remotes/*` else `null`. Exclude every `refs/remotes/*/HEAD`, not only origin's. Order: locals (by name), then remotes grouped by remote name. `selectedRefs` and the `refs` request still use `name`.
+- Each `RepoGraph` gains `basename` (folder name) and `parent` (parent repo name or `null`) so the sidebar can indent nested submodules.
+
+### Tests (`test.mjs`)
+
+- `branches` objects have `name/label/remote`; a remote named `main` with a `HEAD` ref is excluded; `label` of `refs/heads/main` is `main` even when `refname:short` says `heads/main`; nested submodule has `parent === 'libs/sub module'`; root has `basename === 'super project'`.
