@@ -47,9 +47,12 @@ h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06
 .repo-tree{list-style:none;margin:0;padding:0 0 0 8px}
 .repo-tree .repo-tree{padding-left:16px}
 .repo-node{position:relative;border-left:1px solid var(--line);min-width:0}
-.repo-node::before{content:"";position:absolute;z-index:1;top:12px;left:-4px;width:7px;height:7px;border-radius:50%;background:var(--repo-color)}
-.repo-row{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 12px}
-.repo-row::before{content:"";position:absolute;left:0;top:15px;width:8px;border-top:1px solid var(--line)}
+.repo-row .repo-check{position:absolute;z-index:1;left:-7px;top:9px;width:13px;height:13px;appearance:none;-webkit-appearance:none;border-radius:50%;border:2px solid var(--repo-color);background:var(--panel);cursor:pointer}
+.repo-row .repo-check:checked{background:var(--repo-color)}
+.repo-row .repo-check:hover{box-shadow:0 0 0 3px color-mix(in srgb,var(--repo-color) 30%,transparent)}
+.repo-name{border:0;background:none;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.repo-name:hover{text-decoration:underline}
+.repo-row{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 14px}
 .repo-row:hover,.branch-row:hover,.branches summary:hover{background:var(--panel-2)}
 .repo-name,.branch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .repo-row:has(.root-tag) .repo-name{font-weight:600}
@@ -258,9 +261,9 @@ function Sidebar(repos, selection, refs, live) {
   });
   function tree(parent) {
     return `<ul class="repo-tree">${(children.get(parent) ?? []).map(({ repo, color }) => `<li class="repo-node" style="--repo-color:${color}">
-      <label class="repo-row"><input type="checkbox" id="repo-${escape(encodeURIComponent(repo.name))}" data-repo-select value="${escape(repo.name)}"${selection.has(repo.name) ? ' checked' : ''}>
-        <span class="repo-name" title="${escape(repo.name === '.' ? repo.path : repo.name)}">${escape(repo.basename)}</span>${repo.parent === null ? '<span class="root-tag">root</span>' : ''}
-        ${repo.error ? `<span class="error-tag" title="${escape(repo.error)}">error</span>` : ''}<span class="count">${repo.commits.length}</span></label>
+      <div class="repo-row"><input type="checkbox" class="repo-check" id="repo-${escape(encodeURIComponent(repo.name))}" data-repo-select value="${escape(repo.name)}" aria-label="Show ${escape(repo.basename)}"${selection.has(repo.name) ? ' checked' : ''}>
+        <button type="button" class="repo-name" data-repo-solo="${escape(repo.name)}" title="${escape(repo.name === '.' ? repo.path : repo.name)} — click to show only this repository">${escape(repo.basename)}</button>${repo.parent === null ? '<span class="root-tag">root</span>' : ''}
+        ${repo.error ? `<span class="error-tag" title="${escape(repo.error)}">error</span>` : ''}<span class="count">${repo.commits.length}</span></div>
       ${BranchList(repo, refs, live, selection.has(repo.name))}
       ${children.has(repo.name) ? tree(repo.name) : ''}
     </li>`).join('\n')}</ul>`;
@@ -390,6 +393,12 @@ async function start() {
         const details = branches.closest('details');
         branches.closest('fieldset').querySelectorAll('input').forEach(input => { input.checked = branches.dataset.refs === 'all'; });
         selectBranches(details);
+        return;
+      }
+      const solo = event.target.closest('[data-repo-solo]');
+      if (solo) {
+        sidebar.querySelectorAll('[data-repo-select]').forEach(input => { input.checked = input.value === solo.dataset.repoSolo; });
+        select();
         return;
       }
       const button = event.target.closest('[data-select]');
