@@ -115,7 +115,14 @@ export async function openInOrca(url, worktreeId) {
   const worktree = `id:${worktreeId}`
   // `tab list --worktree id:<x>` blocks ~8s when that worktree has no browser tab; `all` returns in ~0.15s.
   const { tabs } = await cli(['tab', 'list', '--worktree', 'all', '--json'])
-  const existing = tabs.find((tab) => tab.url === url && tab.worktreeId === worktreeId)
+  // Match by repo id, not full URL: a restarted server gets a new port and the old tab must follow it.
+  const sameGraph = (tabUrl) => {
+    try {
+      const a = new URL(tabUrl), b = new URL(url)
+      return a.hostname === b.hostname && a.searchParams.get('repo') === b.searchParams.get('repo')
+    } catch { return false }
+  }
+  const existing = tabs.find((tab) => tab.worktreeId === worktreeId && sameGraph(tab.url))
   if (existing) {
     if (!existing.browserPageId) throw new Error('existing graph tab has no browser page id')
     return cli(['goto', '--url', url, '--page', existing.browserPageId, '--json'])
