@@ -29,6 +29,14 @@ h1,.repo-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #status{position:fixed;bottom:8px;right:12px;z-index:3;max-width:calc(100% - 24px);padding:4px 8px;background:var(--panel);overflow-wrap:anywhere;font-size:12px}
 #status:empty{display:none}
 .layout{display:grid;grid-template-columns:300px minmax(0,1fr)}
+.layout.collapsed{grid-template-columns:36px minmax(0,1fr)}
+.layout.collapsed aside{padding:12px 0;overflow:hidden}
+.layout.collapsed .aside-bar{justify-content:center;margin:0}
+.layout.collapsed .aside-bar h2,.layout.collapsed .aside-bar .text-actions,.layout.collapsed #repo-list{display:none}
+#collapse{border:0;background:none;padding:4px;color:var(--muted);font-size:12px;line-height:1;cursor:pointer}
+#collapse:hover{color:var(--fg)}
+.layout.collapsed #collapse{transform:rotate(180deg)}
+@media(prefers-reduced-motion:no-preference){#collapse{transition:transform 120ms}}
 aside{position:sticky;top:48px;align-self:start;height:calc(100dvh - 48px);overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:12px}
 .aside-bar{position:sticky;top:-12px;z-index:1;display:flex;align-items:center;justify-content:space-between;height:36px;margin-top:-12px;margin-bottom:8px;background:var(--panel)}
 h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;margin:0}
@@ -38,7 +46,7 @@ h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06
 .repo-tree{list-style:none;margin:0;padding:0 0 0 8px}
 .repo-tree .repo-tree{padding-left:16px}
 .repo-node{position:relative;border-left:1px solid var(--line);min-width:0}
-.repo-node::before{content:"";position:absolute;top:12px;left:-4px;width:7px;height:7px;border-radius:50%;background:var(--repo-color)}
+.repo-node::before{content:"";position:absolute;z-index:1;top:12px;left:-4px;width:7px;height:7px;border-radius:50%;background:var(--repo-color)}
 .repo-row{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 12px}
 .repo-row::before{content:"";position:absolute;left:0;top:15px;width:8px;border-top:1px solid var(--line)}
 .repo-row:hover,.branch-row:hover,.branches summary:hover{background:var(--panel-2)}
@@ -138,6 +146,7 @@ time{flex-shrink:0;width:8ch;text-align:right;color:var(--muted);font:12px/1.4 v
   <div class="aside-bar">
     <h2>Repositories</h2>
     <div class="text-actions"><button type="button" data-select="all">all</button><span aria-hidden="true">·</span><button type="button" data-select="none">none</button></div>
+    <button id="collapse" type="button" aria-expanded="true" aria-controls="repo-list" title="Collapse sidebar">&#9664;</button>
   </div>
   <div id="repo-list"></div>
 </aside>
@@ -318,6 +327,17 @@ async function start() {
     repoToggle.addEventListener('click', () => {
       repoToggle.setAttribute('aria-expanded', String(sidebar.classList.toggle('open')));
     });
+    const layout = document.querySelector('.layout');
+    const collapse = document.querySelector('#collapse');
+    const collapseKey = 'git-log-graph:sidebar-collapsed';
+    function setCollapsed(collapsed) {
+      layout.classList.toggle('collapsed', collapsed);
+      collapse.setAttribute('aria-expanded', String(!collapsed));
+      collapse.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+      try { localStorage.setItem(collapseKey, collapsed ? '1' : '0'); } catch {}
+    }
+    try { setCollapsed(localStorage.getItem(collapseKey) === '1'); } catch {}
+    collapse.addEventListener('click', () => setCollapsed(!layout.classList.contains('collapsed')));
     function persist() {
       try { localStorage.setItem(key, JSON.stringify({ repos: [...selection], refs })); } catch {}
     }
