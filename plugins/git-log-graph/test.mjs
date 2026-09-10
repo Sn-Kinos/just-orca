@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Script } from 'node:vm';
 import { collectRepos, layoutLanes, buildGitLogHtml } from './viz.mjs';
@@ -142,7 +143,7 @@ try {
   assert.equal(state.pid, process.pid);
   assert.equal(state.port, server.port);
   assert.ok(Number.isFinite(Date.parse(state.startedAt)));
-  assert.deepEqual(await (await request('/health')).json(), { ok: true, pid: process.pid });
+  assert.deepEqual(await (await request('/health')).json(), { ok: true, pid: process.pid, root: fileURLToPath(new URL('./', import.meta.url)) });
   const registration = await register({ path: root });
   assert.equal(registration.status, 200);
   const { id } = await registration.json();

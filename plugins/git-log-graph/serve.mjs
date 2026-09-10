@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const { collectRepos, layoutLanes } = await import(new URL('./viz.mjs', import.meta.url));
 export const DEFAULT_STATE_FILE = join(tmpdir(), 'orca-git-log-graph', 'server.json');
@@ -21,7 +21,7 @@ export async function startServer({ stateFile = DEFAULT_STATE_FILE, idleMs = 60 
     try {
       const url = new URL(request.url, 'http://127.0.0.1');
       if (request.method === 'GET' && url.pathname === '/health') {
-        return send(200, { ok: true, pid: process.pid });
+        return send(200, { ok: true, pid: process.pid, root: fileURLToPath(new URL('.', import.meta.url)) });
       }
       if (request.method === 'POST' && url.pathname === '/register') {
         let path;

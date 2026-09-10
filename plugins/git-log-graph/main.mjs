@@ -55,6 +55,8 @@ export async function resolveWorktree(ctx, log = console.log) {
   return { worktreeId: id, worktreePath: path }
 }
 
+const pluginRoot = fileURLToPath(new URL('.', import.meta.url))
+
 export async function ensureServer() {
   const healthyPort = async (timeout = 1000) => {
     try {
@@ -62,7 +64,13 @@ export async function ensureServer() {
       if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(pid)) return
       const response = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(timeout) })
       const health = await response.json()
-      if (response.ok && health.ok === true && health.pid === pid) return port
+      if (!response.ok || health.ok !== true || health.pid !== pid) return
+      // A server left over from a previous plugin version serves that version's files; replace it.
+      if (health.root !== pluginRoot) {
+        try { process.kill(pid) } catch {}
+        return
+      }
+      return port
     } catch {}
   }
   const port = await healthyPort()
