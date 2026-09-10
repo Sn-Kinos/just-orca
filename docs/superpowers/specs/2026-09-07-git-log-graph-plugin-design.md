@@ -255,3 +255,35 @@ Problem: the sidebar is a bare list of native checkboxes with no hierarchy; bran
 ### Tests (`test.mjs`)
 
 - `branches` objects have `name/label/remote`; a remote named `main` with a `HEAD` ref is excluded; `label` of `refs/heads/main` is `main` even when `refname:short` says `heads/main`; nested submodule has `parent === 'libs/sub module'`; root has `basename === 'super project'`.
+
+## v0.6 — readability pass (2026-09-11)
+
+The v0.5 look is right; the reading experience regressed. Fix with the following exact changes and nothing else.
+
+### Type scale and contrast
+- Body/subject/sidebar names: 14px system sans (was 12–13px mono). Mono stays only for SHA, dates, counts, refs/branch names, and it is 13px, `--fg` (not muted) except where noted.
+- Muted tone lifted for contrast: dark `--muted #a9b3c2`, light `--muted #55617a`. Anything at 12px must use `--fg` or this lifted muted, never a third dimmer tone.
+- Line height 1.4 everywhere; row height 40px.
+
+### Sidebar (aside)
+- Width 300px.
+- One repository = **two lines max**: line 1 = checkbox · name (14px sans, `--fg`, semibold for root, ellipsis + `title`) · count right (13px mono, muted). Line 2 = `pinned d7cd18d · branches 28/28 ▸` in 12px on one line; `pinned <sha>` in mono `--fg`, the dot before it stays amber when HEAD ≠ pin; `branches k/m` is the toggle (chevron). Root has no pinned part. Remove the separate pinned row.
+- Indent per nesting level 16px; rail and dots stay.
+- Branch list rows 28px, names 13px mono `--fg`, group headers 11px uppercase muted.
+- Sticky top of aside: `REPOSITORIES  all · none` stays.
+
+### Commit rows (main)
+- Subject 14px sans `--fg`, `flex: 1`, ellipsis; it must get the space first.
+- Author: 13px sans muted, `max-width: 10ch`, ellipsis, `title` full name. Date: 12px mono muted, `width: 8ch`, right-aligned. Author+date group `flex-shrink: 0`; total right group ≤ 20ch.
+- SHA button 13px mono `--fg`, 9ch.
+- Badges: 12px, ≤ 3 shown inline, the rest collapsed into a `+n` chip (full list in the detail panel); `.badges max-width: 32%`.
+- Hover row background `--panel-2`; keep 2px lane graph.
+
+### Section bar
+- Repo name 14px semibold sans; the other chips 12px mono.
+
+### Header
+- Repo name 15px semibold; path 12px mono muted; filter input 13px.
+
+### Verification
+- Screenshot at 1040px wide: the subject column must show ≥ 45 characters of a typical `chore: bump …` subject; sidebar rows for `sherry-booth-register` must show the full name (300px allows it); no horizontal overflow in `.history`.
