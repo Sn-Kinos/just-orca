@@ -10,6 +10,15 @@ import { Script } from 'node:vm';
 import { collectRepos, layoutLanes, buildGitLogHtml } from './viz.mjs';
 import { startServer } from './serve.mjs';
 
+const marketplace = JSON.parse(await readFile(new URL('../../orca-marketplace.json', import.meta.url), 'utf8'));
+const installedManifest = JSON.parse(await readFile(new URL('../../orca-plugin.json', import.meta.url), 'utf8'));
+const devManifest = JSON.parse(await readFile(new URL('./orca-plugin.json', import.meta.url), 'utf8'));
+assert.deepEqual(installedManifest, { ...devManifest, main: `plugins/git-log-graph/${devManifest.main}` });
+const listing = marketplace.plugins.find(plugin => plugin.id === `${installedManifest.publisher}.${installedManifest.id}`);
+assert.ok(listing, 'Orca marketplace must list Git Log Graph');
+assert.deepEqual(listing.source, { kind: 'git', url: `${installedManifest.repository}.git`, ref: 'main' });
+assert.equal(typeof (await import(new URL(`../../${installedManifest.main}`, import.meta.url))).default, 'function');
+
 const temp = await mkdtemp(join(tmpdir(), 'git-log-graph-test-'));
 const root = join(temp, 'super project');
 const sub = join(temp, 'sub source');

@@ -1,0 +1,16 @@
+{
+  "name": "Just Orca",
+  "owner": "Sn-Kinos",
+  "plugins": [
+    {
+      "id": "kinos.git-log-graph",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/Sn-Kinos/just-orca.git",
+        "ref": "main"
+      },
+      "description": "Commit graph of the focused worktree including all submodules, opened in an Orca browser tab.",
+      "categories": ["git", "keybindings"]
+    }
+  ]
+}

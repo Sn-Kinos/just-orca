@@ -15,12 +15,17 @@
 
 ### Orca (앱 플러그인)
 
-`git-log-graph`는 Orca 앱 자체의 플러그인(`orca-plugin.json`)입니다. Orca의 마켓플레이스 형식은 플러그인이 git 레포 루트에 있어야 해서 이 레포의 하위 폴더는 직접 등록할 수 없습니다. 대신 로컬 경로로 설치합니다.
+`git-log-graph`는 Orca 앱 자체의 플러그인입니다. 이 레포를 마켓플레이스 소스로 추가해 설치할 수 있습니다.
 
-1. 이 레포를 클론합니다.
-2. Orca → **Settings → Plugins**에서 플러그인 시스템을 켭니다.
-3. **플러그인 설치 → 로컬 경로**에 `<클론 경로>/plugins/git-log-graph`를 지정하거나, 개발 중이면 **Development → 경로 추가**에 같은 경로를 넣습니다.
+1. Orca → **Settings → Plugins**에서 플러그인 시스템을 켭니다.
+2. **마켓플레이스 소스**에서 Git URL에 `https://github.com/Sn-Kinos/just-orca.git`, Git ref에 `main`을 입력하고 **소스 추가**를 누릅니다.
+3. 카탈로그에서 **Git Log Graph** (`kinos.git-log-graph`)를 설치합니다.
 4. 권한(`workspace:read`, `notifications:show`)을 검토하고 활성화합니다.
+
+Orca는 저장소 루트의 `orca-marketplace.json`을 읽습니다. 설치 시에는 루트의 `orca-plugin.json`이 `plugins/git-log-graph/main.mjs`를 실행합니다.
+소스 수정 후에는 GitHub의 `main`에 푸시해야 마켓플레이스에 반영됩니다.
+
+로컬 설치는 이 레포를 클론한 뒤 **플러그인 설치 → 로컬 경로**에 `<클론 경로>/plugins/git-log-graph`를 지정합니다. 개발 중이면 **Development → 경로 추가**에 같은 경로를 넣습니다.
 
 자세한 사용법은 [plugins/git-log-graph/README.md](plugins/git-log-graph/README.md)를 참고하세요.
 
@@ -45,18 +50,28 @@ codex plugin marketplace add Sn-Kinos/just-orca
 1. `plugins/<플러그인명>/` 안에 스킬 등 플러그인 파일을 넣습니다.
 2. 지원하는 앱의 매니페스트만 만듭니다.
    Claude Code는 `.claude-plugin/plugin.json`, Codex는 `.codex-plugin/plugin.json`을 사용합니다.
-   Orca 앱 플러그인은 `orca-plugin.json`을 사용하며, 카탈로그 없이 로컬 경로로 설치합니다.
+   Orca 앱 플러그인은 `orca-plugin.json`을 사용합니다. 마켓플레이스에서 설치할 Git 소스는 해당 매니페스트를 저장소 루트에 포함해야 합니다.
 3. 해당 앱의 카탈로그에만 등록합니다. 두 앱을 모두 지원할 필요는 없습니다.
 4. 위 목록에 기능과 지원 앱을 적고, 각 지원 앱에서 설치를 확인합니다.
 
 | 앱 | 레포 루트의 카탈로그 | 플러그인 경로 형식 |
 | --- | --- | --- |
+| Orca | `orca-marketplace.json` | `"source": {"kind": "git", "url": "https://github.com/<owner>/<repo>.git", "ref": "main"}` |
 | Claude Code | `.claude-plugin/marketplace.json` | `"source": "./plugins/<플러그인명>"` |
 | Codex | `.agents/plugins/marketplace.json` | `"source": {"source": "local", "path": "./plugins/<플러그인명>"}` |
 
 다른 앱을 지원하는 플러그인은 해당 앱의 배포 형식과 설치 방법을 함께 추가합니다.
 플러그인 이름은 폴더·매니페스트·카탈로그에서 동일하게 유지하고, 업데이트할 때 해당 플러그인의 매니페스트 버전을 올립니다.
 여러 앱을 지원하면 그 플러그인의 버전을 함께 올립니다.
+
+현재 Orca Git 소스에는 하위 폴더를 지정하는 필드가 없어, 이 레포의 루트 매니페스트는 `git-log-graph` 하나를 가리킵니다. 다른 Orca 플러그인을 카탈로그에 추가하려면 루트 매니페스트를 제공하는 별도 Git 소스가 필요합니다.
+`git-log-graph`의 매니페스트를 수정할 때는 루트와 플러그인 폴더의 매니페스트를 함께 갱신합니다. `main` 경로만 다릅니다.
+
+Orca 카탈로그의 플러그인 연결과 루트 진입점, 기존 플러그인 기능은 다음 명령으로 검사합니다.
+
+```sh
+node plugins/git-log-graph/test.mjs
+```
 
 Claude Code 카탈로그는 다음 명령으로 검사할 수 있습니다.
 
