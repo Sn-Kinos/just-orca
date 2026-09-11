@@ -56,7 +56,9 @@ h2,.branch-group-name{font-size:11px;text-transform:uppercase;letter-spacing:.06
 .repo-row:hover,.branch-row:hover,.branches summary:hover{background:var(--panel-2)}
 .repo-name,.branch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .repo-row:has(.root-tag) .repo-name{font-weight:600}
-.branch-name{font:13px/1.4 var(--mono)}
+.branch-name{font:13px/1.4 var(--mono);border:0;background:none;padding:0;color:inherit;text-align:left;cursor:pointer}
+.branch-name:hover:not(:disabled){text-decoration:underline}
+.branch-name:disabled{cursor:default}
 .root-tag{font-size:10px;color:var(--muted)}
 .count{margin-left:auto;flex-shrink:0;color:var(--muted);font:13px/1.4 var(--mono)}
 .error-tag{color:var(--pin);font-size:11px}
@@ -251,7 +253,7 @@ function BranchList(repo, refs, live, visible) {
       <div class="branch-group-bar"><span class="branch-group-name" title="${escape(group)}">${escape(group)}</span><div class="text-actions">
         ${['all', 'none'].map(action => `<button type="button" id="group-${escape(encodeURIComponent(JSON.stringify([repo.name, group, action])))}" data-refs="${action}" aria-label="Select ${action} ${escape(group)} branches"${action === 'none' ? ' title="No branches selected uses all refs"' : ''}>${action}</button>`).join('<span aria-hidden="true">·</span>')}
       </div></div>
-      ${branches.map(branch => `<label class="branch-row"><input type="checkbox" id="${escape(encodeURIComponent(JSON.stringify([repo.name, branch.name])))}" value="${escape(branch.name)}"${selected.has(branch.name) ? ' checked' : ''}><span class="branch-name" title="${escape(branch.label)}">${escape(branch.label)}</span></label>`).join('\n')}
+      ${branches.map(branch => `<div class="branch-row"><input type="checkbox" id="${escape(encodeURIComponent(JSON.stringify([repo.name, branch.name])))}" value="${escape(branch.name)}" aria-label="Show ${escape(branch.label)}"${selected.has(branch.name) ? ' checked' : ''}><button type="button" class="branch-name" data-branch-solo="${escape(branch.name)}" title="${escape(branch.label)} — click to show only this branch"${live ? '' : ' disabled'}>${escape(branch.label)}</button></div>`).join('\n')}
     </fieldset>`).join('\n')}
   </details>`;
 }
@@ -395,6 +397,13 @@ async function start() {
       if (branches && live) {
         const details = branches.closest('details');
         branches.closest('fieldset').querySelectorAll('input').forEach(input => { input.checked = branches.dataset.refs === 'all'; });
+        selectBranches(details);
+        return;
+      }
+      const branchSolo = event.target.closest('[data-branch-solo]');
+      if (branchSolo && live) {
+        const details = branchSolo.closest('details');
+        details.querySelectorAll('input').forEach(input => { input.checked = input.value === branchSolo.dataset.branchSolo; });
         selectBranches(details);
         return;
       }

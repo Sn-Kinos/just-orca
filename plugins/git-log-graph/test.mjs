@@ -82,7 +82,7 @@ try {
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
   for (const text of ['class="commit"', 'class="detail" hidden', 'aria-expanded="false"', 'role="button" tabindex="0"', 'text-overflow:ellipsis', 'y2="100%"']) assert.ok(template.includes(text), text);
-  for (const text of ['class="badge badge-more"', 'badges.slice(0, 2)', '+${badges.length - 2}', 'class="branch-count"', 'class="byline"', 'data-repo-solo', 'class="repo-check"']) assert.ok(template.includes(text), text);
+  for (const text of ['class="badge badge-more"', 'badges.slice(0, 2)', '+${badges.length - 2}', 'class="branch-count"', 'class="byline"', 'data-repo-solo', 'class="repo-check"', 'data-branch-solo']) assert.ok(template.includes(text), text);
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
   const script = template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   new Script(script);
@@ -241,8 +241,8 @@ try {
   for (const group of ['local', 'remotes/main', 'remotes/zeta']) assert.ok(picker.includes(`title="${group}">${group}</span>`));
   assert.equal((picker.match(/<fieldset /g) ?? []).length, 3);
   assert.equal((picker.match(/data-refs="all"/g) ?? []).length, 3);
-  assert.ok(picker.includes('value="heads/main" checked'));
-  assert.ok(picker.includes('title="main">main</span>'));
+  assert.ok(/value="heads\/main"[^>]*checked/.test(picker));
+  assert.ok(picker.includes('data-branch-solo="heads/main"') && picker.includes('>main</button>'));
   assert.ok(!picker.includes('>heads/main<') && !picker.includes('/HEAD'));
   assert.ok(BranchList(ambiguous, {}, false, true).includes(' disabled'));
   assert.ok(BranchList(ambiguous, {}, true, false).includes(' hidden'));
