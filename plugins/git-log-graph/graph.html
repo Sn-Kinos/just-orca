@@ -102,10 +102,13 @@ body:not(.live) .section-actions{display:none}
 .row.filtered .text,.row.filtered + .detail .detail-content{opacity:.25}
 .badges{display:flex;gap:4px;flex:0 0 auto;white-space:nowrap}
 .badges:empty{display:none}
-.badge{display:inline-block;vertical-align:middle;flex:0 0 auto;max-width:12ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 5px;font:12px/1.4 var(--mono)}
+.badge{display:inline-block;vertical-align:middle;flex:0 0 auto;max-width:12ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:3px;padding:1px 6px;font:500 12px/1.4 var(--mono)}
 .badge-more,.badge.head{flex-shrink:0;min-width:0}
-.head{background:var(--accent);border-color:var(--accent);color:var(--bg)}
-.tag{border-color:var(--pin)}
+.badge.branch{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.badge.branch.remote{color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent);border-color:color-mix(in srgb,var(--muted) 40%,transparent)}
+.head{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600}
+.tag{color:var(--pin);background:color-mix(in srgb,var(--pin) 14%,transparent);border-color:color-mix(in srgb,var(--pin) 50%,transparent)}
+.badge-more{color:var(--muted);background:var(--panel-2)}
 .pin{background:var(--pin);border-color:var(--pin);color:#0f1216}
 .subject{flex:1;min-width:12ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .byline{display:flex;align-items:center;gap:8px;flex-shrink:0;max-width:20ch;font-size:13px}
@@ -173,8 +176,8 @@ time{flex-shrink:0;width:8ch;text-align:right;color:var(--muted);font:12px/1.4 v
 const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const colors = ['#5b9cff', '#f2994a', '#2ec4a6', '#b388ff', '#ff6b8a', '#c9c22f', '#23b5d3', '#a58b6f'];
 
-function RefBadge(ref) {
-  const kind = ref === 'HEAD' ? 'head' : ref.startsWith('tag: ') ? 'tag' : 'branch';
+function RefBadge(ref, remotes = new Set()) {
+  const kind = ref === 'HEAD' ? 'head' : ref.startsWith('tag: ') ? 'tag' : remotes.has(ref) ? 'branch remote' : 'branch';
   return `<span class="badge ${kind}" title="${escape(ref)}">${escape(ref)}</span>`;
 }
 
@@ -205,7 +208,7 @@ function CommitDetail(row, lanesWidth) {
         <dt>Parents</dt><dd>${row.parents.map(sha => ShaButton(sha)).join(' ') || 'None'}</dd>
         <dt>Author</dt><dd>${escape(row.author)}</dd>
         <dt>Date</dt><dd><time datetime="${date}">${date}</time></dd>
-        <dt>Refs</dt><dd>${row.pinned ? '<span class="badge pin">pinned by superproject</span> ' : ''}${row.refs.map(RefBadge).join(' ') || (row.pinned ? '' : 'None')}</dd>
+        <dt>Refs</dt><dd>${row.pinned ? '<span class="badge pin">pinned by superproject</span> ' : ''}${row.refs.map(ref => RefBadge(ref, row.remotes)).join(' ') || (row.pinned ? '' : 'None')}</dd>
       </dl>
     </div>
   </div>`;
@@ -213,7 +216,7 @@ function CommitDetail(row, lanesWidth) {
 
 function CommitRow(row, lanesWidth) {
   const date = new Date(row.ts * 1000).toISOString();
-  const badges = [...(row.pinned ? ['<span class="badge pin">pinned by superproject</span>'] : []), ...row.refs.map(RefBadge)];
+  const badges = [...(row.pinned ? ['<span class="badge pin">pinned by superproject</span>'] : []), ...row.refs.map(ref => RefBadge(ref, row.remotes))];
   return `<div class="commit"><div class="row${row.pinned ? ' pinned' : ''}" role="button" tabindex="0" aria-expanded="false" data-sha="${escape(row.sha)}"
       data-parent-lanes="${row.parentsLanes.join(',')}" data-search="${escape(`${row.sha} ${row.author} ${row.subject}`.toLowerCase())}">
     <svg width="${lanesWidth}" height="40" aria-hidden="true" fill="none" stroke-width="2">${LaneGraph(row)}</svg>
@@ -233,10 +236,12 @@ function RepoSection(repo) {
     ?? head?.refs.find(ref => ref !== 'HEAD' && !ref.startsWith('tag: '))
     ?? (repo.head.slice(0, 8) || (repo.error ? 'unavailable' : 'unborn'));
   const lanesWidth = Math.max(1, ...repo.rows.map(row => row.width)) * 20 + 16;
+  const remotes = new Set((repo.branches ?? []).filter(branch => branch.remote).map(branch => branch.name));
   const rows = repo.rows.map(row => CommitRow({
     ...row,
     pinned: row.sha === repo.pinnedSha,
-    refs: [...(row.sha === repo.head ? ['HEAD'] : []), ...row.refs.filter(ref => ref !== 'HEAD')]
+    refs: [...(row.sha === repo.head ? ['HEAD'] : []), ...row.refs.filter(ref => ref !== 'HEAD')],
+    remotes
   }, lanesWidth)).join('\n');
   return `<section data-repo="${escape(repo.name)}"><details open>
     <summary class="section-bar"><span class="section-name" title="${escape(repo.path)}">${escape(repo.basename)}</span>
