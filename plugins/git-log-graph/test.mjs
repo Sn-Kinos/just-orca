@@ -82,7 +82,7 @@ try {
   const template = await readFile(new URL('./graph.html', import.meta.url), 'utf8');
   assert.ok(template.includes('No data — run'));
   for (const text of ['class="commit"', 'class="detail" hidden', 'aria-expanded="false"', 'role="button" tabindex="0"', 'text-overflow:ellipsis', 'y2="100%"']) assert.ok(template.includes(text), text);
-  for (const text of ['class="badge badge-more"', 'badges.slice(0, 2)', '+${badges.length - 2}', 'class="branch-count"', 'class="byline"', 'data-repo-solo', 'class="repo-check"', 'data-branch-solo']) assert.ok(template.includes(text), text);
+  for (const text of ['class="badge badge-more"', 'badges.slice(0, 2)', '+${badges.length - 2}', 'class="branch-count"', 'class="byline"', 'data-repo-solo', 'class="repo-check"', 'data-branch-solo', 'data-git="fetch"', 'data-git="pull"', "fetch('/git' + location.search"]) assert.ok(template.includes(text), text);
   assert.ok(template.includes('<script id="repos" type="application/json">/*__ORCA_GIT_LOG_DATA__*/</script>'));
   const script = template.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   new Script(script);
@@ -201,6 +201,18 @@ try {
     assert.ok((await invalid.json()).error);
   }
   assert.equal((await request('/register', { method: 'POST', body: '{' })).status, 400);
+  // fetch/pull: refused for unknown ops and unknown repos; fetch on a repo without remotes is a no-op success.
+  const gitPost = body => request(`/git?repo=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await gitPost({ op: 'push' })).status, 400);
+  assert.equal((await gitPost({ op: 'fetch', repo: 'nope' })).status, 404);
+  assert.equal((await gitPost({ op: 'fetch', repo: 'stray/link' })).status, 404);
+  const fetched = await gitPost({ op: 'fetch' });
+  assert.equal(fetched.status, 200);
+  assert.equal((await fetched.json()).op, 'fetch');
+  // The submodule is checked out at a pinned sha (detached HEAD): pull must fail with git's own message, not crash.
+  const pulled = await gitPost({ op: 'pull', repo: 'libs/sub module' });
+  assert.equal(pulled.status, 500);
+  assert.match((await pulled.json()).error, /not currently on a branch/);
   assert.equal((await register({ path: 'x'.repeat(128 * 1024) })).status, 400);
   const nonRepo = await (await register({ path: temp })).json();
   const failure = await request(`/data?repo=${nonRepo.id}`);

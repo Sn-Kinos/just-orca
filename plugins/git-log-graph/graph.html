@@ -88,6 +88,11 @@ section{margin-bottom:12px;border:1px solid var(--line)}
 .section-name{min-width:0;overflow:hidden;text-overflow:ellipsis;font:600 14px/1.4 var(--sans);letter-spacing:.01em}
 .section-bar .badge{min-width:0}
 .section-bar .count{margin-left:0;font-size:12px;color:var(--fg)}
+.section-actions{margin-left:auto;display:flex;gap:4px}
+.section-actions button,#fetch,#pull{padding:2px 8px;font:12px/1.4 var(--mono);border:1px solid var(--line);border-radius:3px;background:none;color:var(--muted);cursor:pointer}
+.section-actions button:hover,#fetch:hover,#pull:hover{color:var(--fg);background:var(--panel-2)}
+.section-actions button:disabled,#fetch:disabled,#pull:disabled{opacity:.5;cursor:progress}
+body:not(.live) .section-actions{display:none}
 .history{overflow-x:auto;padding:0 8px}
 .row{display:flex;height:40px;align-items:center;cursor:pointer}
 .row:hover{background:var(--panel-2)}
@@ -146,6 +151,8 @@ time{flex-shrink:0;width:8ch;text-align:right;color:var(--muted);font:12px/1.4 v
   <div class="identity"><h1>Git Log Graph</h1><span class="repo-path"></span></div>
   <div class="toolbar">
     <input id="filter" type="search" aria-label="Filter commits" placeholder="filter: author, subject, sha">
+    <button id="fetch" type="button" data-git="fetch" title="git fetch --all --prune in the root repository" hidden>Fetch</button>
+    <button id="pull" type="button" data-git="pull" title="git pull --ff-only in the root repository" hidden>Pull</button>
     <button id="refresh" type="button" hidden>Refresh</button>
   </div>
 </header>
@@ -234,7 +241,8 @@ function RepoSection(repo) {
   return `<section data-repo="${escape(repo.name)}"><details open>
     <summary class="section-bar"><span class="section-name" title="${escape(repo.path)}">${escape(repo.basename)}</span>
       <span class="badge" title="${escape(branch)}">${escape(branch)}</span><span class="badge count" title="Commits">${repo.commits.length}</span>
-      <span class="badge">${repo.selectedRefs ? `${repo.selectedRefs.length} of ${repo.branches.length} refs` : 'all refs'}</span></summary>
+      <span class="badge">${repo.selectedRefs ? `${repo.selectedRefs.length} of ${repo.branches.length} refs` : 'all refs'}</span>
+      <span class="section-actions"><button type="button" data-git="fetch" data-git-repo="${escape(repo.name)}" title="git fetch --all --prune">fetch</button><button type="button" data-git="pull" data-git-repo="${escape(repo.name)}" title="git pull --ff-only">pull</button></span></summary>
     <div class="history">${repo.error ? `<p role="alert">${escape(repo.error)}</p>` : rows || '<p>No commits</p>'}</div>
   </details></section>`;
 }
@@ -307,6 +315,30 @@ async function start() {
   const refresh = document.querySelector('#refresh');
   refresh.hidden = !live;
   refresh.addEventListener('click', () => location.reload());
+  let reload = () => location.reload();
+  document.body.classList.toggle('live', live);
+  for (const id of ['fetch', 'pull']) document.getElementById(id).hidden = !live;
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-git]');
+    if (!button || !live) return;
+    event.preventDefault();
+    const status = document.querySelector('#status');
+    const op = button.dataset.git, repo = button.dataset.gitRepo ?? '.';
+    const label = repo === '.' ? op : `${op} ${repo}`;
+    button.disabled = true;
+    status.textContent = `${label}…`;
+    try {
+      const response = await fetch('/git' + location.search, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, repo }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Request failed: ' + response.status);
+      await reload();
+      status.textContent = `${label}: ${result.output.split('\n').pop() || 'done'}`;
+    } catch (error) {
+      status.textContent = `${label} failed: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
   const key = 'git-log-graph:' + location.search;
   let selection;
   let refs = Object.create(null);
@@ -377,6 +409,9 @@ async function start() {
       else refs[details.dataset.branches] = selected;
       details.querySelector('.branch-count').textContent = `branches ${selected.length}/${details.querySelectorAll('input').length}`;
       persist();
+      await reloadData();
+    }
+    async function reloadData() {
       const current = ++request;
       try {
         const data = await loadData(refs, true);
@@ -388,6 +423,7 @@ async function start() {
         if (current === request) document.querySelector('#status').textContent = error.message;
       }
     }
+    reload = reloadData;
     sidebar.addEventListener('change', event => {
       if (event.target.matches('[data-repo-select]')) select();
       else if (live && event.target.matches('.branches input')) selectBranches(event.target.closest('details'));

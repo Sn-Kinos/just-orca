@@ -57,6 +57,10 @@ Because the plugin contributes a keybinding, Orca folds the live tree hash of a 
 
 If you keep a separate dev plugin copy to avoid re-approving every source edit, copy `orca-plugin.json`, `main.mjs`, `serve.mjs`, `viz.mjs`, and **`graph.html`** into that folder. Keep these files together; the CLI and server load the template relative to their modules. Restart the server after changing its code; refreshing the page reads the current `graph.html`.
 
+## Fetch and pull
+
+In live mode the header has **Fetch** and **Pull** for the root repository, and every repository section bar has its own `fetch` / `pull`. They run `git fetch --all --prune` and `git pull --ff-only` in that repository (never in another path), with `GIT_TERMINAL_PROMPT=0` so a credential prompt fails fast instead of hanging. The graph reloads afterwards and the last line of git's output shows in the status corner. A pull on a detached-HEAD submodule fails with git's own message.
+
 ## Limits
 
 - Default maximum: 500 commits per repository; standalone `--limit N` or the server's `/data?repo=<id>&limit=N` overrides it. No incremental loading.

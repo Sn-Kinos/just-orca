@@ -1,4 +1,6 @@
 import { createServer } from 'node:http';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -45,6 +47,27 @@ export async function startServer({ stateFile = DEFAULT_STATE_FILE, idleMs = 60 
       }
       const path = paths.get(url.searchParams.get('repo'));
       if (!path) return send(404, { error: 'Not found' });
+      if (request.method === 'POST' && url.pathname === '/git') {
+        // Only fetch/pull, only in a registered repo or one of its submodules (names come from collectRepos).
+        let body = '';
+        request.setEncoding('utf8');
+        for await (const chunk of request) { if (body.length <= 4096) body += chunk; }
+        let input;
+        try { input = JSON.parse(body); } catch { return send(400, { error: 'Expected a JSON body' }); }
+        if (!['fetch', 'pull'].includes(input?.op)) return send(400, { error: 'op must be fetch or pull' });
+        const target = typeof input.repo === 'string' ? input.repo : '.';
+        const repos = await collectRepos(path, { limit: 1 });
+        const repo = repos.find(entry => entry.name === target);
+        if (!repo || repo.error) return send(404, { error: `Unknown repository: ${target}` });
+        const args = input.op === 'fetch' ? ['fetch', '--all', '--prune'] : ['pull', '--ff-only'];
+        try {
+          const { stdout, stderr } = await promisify(execFile)('git', args, { cwd: repo.path, timeout: 120000, maxBuffer: 4 * 1024 * 1024,
+            env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+          return send(200, { ok: true, op: input.op, repo: target, output: (stdout + stderr).trim() });
+        } catch (error) {
+          return send(500, { error: ((error.stderr ?? '') + (error.stdout ?? '')).trim() || error.message });
+        }
+      }
       if (request.method === 'GET' && url.pathname === '/') {
         return send(200, await readFile(new URL('./graph.html', import.meta.url), 'utf8'), 'text/html; charset=utf-8');
       }
