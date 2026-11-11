@@ -203,7 +203,7 @@ function QueueItem({ card }: { card: QueueCard }) {
   const answerable = card.status === 'open' || card.status === 'answered'
   const evidence = item.evidence ?? []
   return (
-    <Box border radius="md" padding="md" gap="sm" background="card">
+    <Box radius="md" padding="md" gap="sm" background="card">
       <Row justify="between" align="center">
         <Badge tone={kind.tone}>{kind.label}</Badge>
         <Text muted size="xs">
@@ -299,9 +299,9 @@ function Section({ id, title, cards }: { id: string; title: string; cards: Queue
           {cards.length}
         </Text>
       </Row>
-      <Stack gap="md">
+      <Stack gap="lg">
         {byProject(cards).map(([project, group]) => (
-          <Box key={`group-${id}-${project}`} background="muted" radius="lg" padding="sm" gap="sm">
+          <Box key={`group-${id}-${project}`} background="muted" radius="lg" padding="md" gap="md">
             <Row gap="xs" align="center">
               <Text weight="semibold" truncate>
                 {project}
@@ -312,7 +312,7 @@ function Section({ id, title, cards }: { id: string; title: string; cards: Queue
                 </Text>
               )}
             </Row>
-            <Stack gap="sm">
+            <Stack gap="md">
               {group.map((card) => (
                 <Stack key={`card-${card.item.id}`} gap="none">
                   <QueueItem card={card} />
