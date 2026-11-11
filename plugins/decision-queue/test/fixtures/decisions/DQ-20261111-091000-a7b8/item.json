@@ -1,0 +1,13 @@
+{
+  "id": "DQ-20261111-091000-a7b8",
+  "createdAt": "2026-11-11T09:10:00+09:00",
+  "project": "Sample Shop",
+  "kind": "review",
+  "title": "회원가입 화면 검토",
+  "evidence": [
+    {
+      "label": "나란히 비교",
+      "path": "/tmp/dq-sample/signup-compare.png"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "manifestVersion": 2,
+  "id": "decision-queue",
+  "name": "결정 대기",
+  "version": "0.1.0",
+  "description": "Decisions an orchestrator agent needs from you, answered in the right sidebar.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "decision-queue",
+        "title": "결정 대기",
+        "icon": "bell",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "waiting",
+        "text": "결정 -",
+        "icon": "bell",
+        "tooltip": "오른쪽 사이드바의 결정 대기"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "notifications:show"
+    },
+    {
+      "kind": "terminal:send"
+    }
+  ]
+}

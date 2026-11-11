@@ -1,0 +1,19 @@
+{
+  "id": "DQ-20261111-101500-a1b2",
+  "createdAt": "2026-11-11T10:15:00+09:00",
+  "project": "Sample Shop",
+  "kind": "approve",
+  "title": "스테이징에 로그인 수정 배포",
+  "body": "시험 42개 통과, 리뷰어가 받아들였습니다.",
+  "proposal": "지금 배포",
+  "evidence": [
+    {
+      "label": "시연 녹화",
+      "path": "/tmp/dq-sample/login-fix.mp4"
+    },
+    {
+      "label": "시험 출력",
+      "path": "/tmp/dq-sample/test-output.txt"
+    }
+  ]
+}

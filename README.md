@@ -8,6 +8,7 @@
 | 플러그인 | 기능 | 지원 앱 |
 | --- | --- | --- |
 | [git-log-graph](plugins/git-log-graph) | 워크트리와 모든 서브모듈의 커밋 그래프를 Orca 브라우저 탭에서 보기 (`⌘⌥L`) | Orca |
+| [decision-queue](plugins/decision-queue) | 오케스트레이터 에이전트가 올린 결정(승인·선택·검토·발송 준비)을 오른쪽 사이드바에서 처리 | Orca (로컬 경로 설치) |
 
 ## 설치
 
