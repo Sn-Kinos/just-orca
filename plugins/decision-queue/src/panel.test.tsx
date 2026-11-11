@@ -149,6 +149,22 @@ test('cards are grouped by project under each section, the project named once', 
   await view.unmount()
 })
 
+test('an opened note can be closed again without sending anything', async () => {
+  const { host, answers } = setup({ configured: true, cards, invalid: [] })
+  const view = await mount(panel, { host })
+  await view.press({ testId: 'instruct-DQ-1' })
+  assert.ok(view.find({ testId: 'note-DQ-1' }), 'the note opens')
+  await view.type({ testId: 'note-DQ-1' }, 'typed by mistake')
+  await view.press({ testId: 'cancel-DQ-1' })
+  assert.equal(view.find({ testId: 'note-DQ-1' }), null, 'the note closes')
+  assert.equal(view.find({ testId: 'cancel-DQ-1' }), null)
+  assert.deepEqual(answers, [])
+  // Reopened, it starts empty.
+  await view.press({ testId: 'instruct-DQ-1' })
+  assert.equal(view.valueOf({ testId: 'note-DQ-1' }), '')
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })

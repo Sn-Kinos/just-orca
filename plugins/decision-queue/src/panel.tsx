@@ -120,6 +120,13 @@ function evidenceIcon(path: string): IconName {
   return 'file'
 }
 
+/** Closes a card's note field and forgets what was typed in it. */
+function closeNote(id: string): void {
+  update(noteOpen, (all) => ({ ...all, [id]: false }))
+  update(notes, (all) => ({ ...all, [id]: '' }))
+  setError(id, '')
+}
+
 function Answers({ card }: { card: QueueCard }) {
   const { id, kind, options } = card.item
   const locked = !!read(sending)[id]
@@ -158,7 +165,14 @@ function Answers({ card }: { card: QueueCard }) {
           }),
           <Button key={`instruct-${id}`} variant="ghost" icon="edit" disabled={locked} onPress={() => (open ? answer(id, 'instruct') : update(noteOpen, (all) => ({ ...all, [id]: true })))}>
             {open ? '지시 보내기' : '지시'}
-          </Button>
+          </Button>,
+          ...(open
+            ? [
+                <Button key={`cancel-${id}`} variant="ghost" disabled={locked} onPress={() => closeNote(id)}>
+                  취소
+                </Button>
+              ]
+            : [])
         ]}
       </Row>
       {open && (
