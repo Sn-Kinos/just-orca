@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "decision-queue",
   "name": "결정 대기",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Decisions an orchestrator agent needs from you, answered in the right sidebar.",
   "engines": {
     "orca": ">=1.4.248"
@@ -35,9 +35,6 @@
     },
     {
       "kind": "notifications:show"
-    },
-    {
-      "kind": "terminal:send"
     }
   ]
 }

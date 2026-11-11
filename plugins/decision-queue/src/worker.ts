@@ -3,12 +3,13 @@
 // Nothing is read, typed or opened until the person presses setup in the panel (README.md).
 import type { OrcaWorkerApi } from 'orca/worker'
 import { execFile } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from 'node:fs'
+import { mkdirSync, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import type { AnswerInput, QueueView } from './protocol'
 import { evidenceTarget, loadQueue, markRelayed, writeAnswer } from './queue'
+import { relayAnswer, type RelayConfig } from './relay'
 
-type Config = { dir: string; handleFile: string; open: 'system' | 'none' }
+type Config = RelayConfig & { dir: string; open: 'system' | 'none' }
 const CONFIG = 'config'
 const NOTIFIED = 'notified'
 const BAR = 'waiting'
@@ -16,9 +17,22 @@ const BAR = 'waiting'
 let watcher: FSWatcher | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 
+/** This Mac's defaults; setup stores them, and a config saved before a field existed gets it here. */
+function defaults(): Config {
+  const home = process.env.HOME ?? ''
+  return {
+    dir: join(home, '.local/state/ryude/decisions'),
+    handleFile: join(home, '.config/ryude/handle'),
+    open: 'system',
+    orcaBin: '/Applications/Orca.app/Contents/Resources/bin/orca',
+    workspace: join(home, 'orca'),
+    agentTitle: '류드'
+  }
+}
+
 async function config(orca: OrcaWorkerApi): Promise<Config | null> {
-  const value = (await orca.storage.get(CONFIG)) as Config | null
-  return value && typeof value.dir === 'string' ? value : null
+  const value = (await orca.storage.get(CONFIG)) as Partial<Config> | null
+  return value && typeof value.dir === 'string' ? { ...defaults(), ...value } : null
 }
 
 /** Reads the queue, then updates the status bar and announces items not announced before. */
@@ -65,34 +79,11 @@ async function startWatching(orca: OrcaWorkerApi): Promise<void> {
   watcher.unref()
 }
 
-/** Types one line naming the item into the agent's terminal. False when it could not. */
-async function relay(orca: OrcaWorkerApi, cfg: Config, id: string): Promise<boolean> {
-  if (!existsSync(cfg.handleFile)) return false
-  const terminalId = readFileSync(cfg.handleFile, 'utf8').trim()
-  if (!terminalId) return false
-  try {
-    const sent = await orca.host.call('terminal.sendText', {
-      terminalId,
-      text: `[결정 대기] ${id} 답 있음. 답 파일을 직접 읽고 처리해 줘.`,
-      enter: true
-    })
-    return sent.accepted
-  } catch (e) {
-    orca.log(`relay failed for ${id}: ${e}`)
-    return false
-  }
-}
-
 export default async function activate(orca: OrcaWorkerApi): Promise<void> {
   orca.panels.handle('queue.list', () => scan(orca))
 
   orca.panels.handle('config.setup', async () => {
-    const home = process.env.HOME ?? ''
-    const cfg: Config = {
-      dir: join(home, '.local/state/ryude/decisions'),
-      handleFile: join(home, '.config/ryude/handle'),
-      open: 'system'
-    }
+    const cfg = defaults()
     mkdirSync(cfg.dir, { recursive: true })
     await orca.storage.set(CONFIG, cfg)
     await startWatching(orca)
@@ -103,7 +94,7 @@ export default async function activate(orca: OrcaWorkerApi): Promise<void> {
     const cfg = await config(orca)
     if (!cfg) throw Object.assign(new Error('set up the queue first'), { code: 'conflict' })
     writeAnswer(cfg.dir, input)
-    markRelayed(cfg.dir, input.id, await relay(orca, cfg, input.id))
+    markRelayed(cfg.dir, input.id, await relayAnswer(cfg, input.id, (m) => orca.log(m)))
     return broadcast(orca)
   })
 

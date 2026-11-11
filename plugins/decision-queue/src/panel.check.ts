@@ -7,7 +7,7 @@ const fixtures = new URL('../test/fixtures/decisions', import.meta.url).pathname
 export default defineCheck({
   fresh: {},
   queue: {
-    storage: { config: { dir: fixtures, handleFile: '/nonexistent/handle', open: 'none' }, notified: [] },
-    results: { 'notifications.show': { delivered: true }, 'statusBar.update': { ok: true }, 'terminal.sendText': { accepted: false } }
+    storage: { config: { dir: fixtures, handleFile: '/nonexistent/handle', open: 'none', orcaBin: '/nonexistent/orca' }, notified: [] },
+    results: { 'notifications.show': { delivered: true }, 'statusBar.update': { ok: true } }
   }
 })
