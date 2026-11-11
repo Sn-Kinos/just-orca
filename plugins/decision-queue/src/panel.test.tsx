@@ -165,6 +165,23 @@ test('an opened note can be closed again without sending anything', async () => 
   await view.unmount()
 })
 
+test('finished items are grouped under their project too', async () => {
+  const done = (id: string, project: string, title: string): Card => ({
+    item: { id, createdAt: at, project, kind: 'approve', title },
+    status: 'done',
+    answer: { itemHash: 'h', verdict: 'approve', at, relayed: true },
+    stateNote: 'merged'
+  })
+  const { host } = setup({ configured: true, cards: [done('DQ-a', 'Sample Shop', 'Merge PR 7'), done('DQ-b', 'Demo Clinic', 'Deploy v2')], invalid: [] })
+  const view = await mount(panel, { host })
+  await view.toggle({ text: /끝난 항목 2개/ })
+  const group = view.find({ testId: 'group-done-Demo Clinic' })
+  assert.ok(group?.text.startsWith('Demo Clinic'), group?.text)
+  assert.ok(group?.text.includes('Deploy v2'))
+  assert.ok(!group?.text.includes('Merge PR 7'))
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })

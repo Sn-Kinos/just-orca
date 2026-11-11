@@ -286,9 +286,7 @@ function DoneItem({ card }: { card: QueueCard }) {
         </Text>
       </Row>
       <Text muted size="xs">
-        {card.item.project}
-        {a ? ` · ${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}` : ''}
-        {card.stateNote ? ` · ${card.stateNote}` : ''}
+        {[a && `${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}`, card.stateNote].filter(Boolean).join(' · ')}
       </Text>
     </Box>
   )
@@ -371,10 +369,19 @@ export default function Panel() {
       <Section id="taken" title="처리 중" cards={by('taken')} />
       {done.length > 0 && (
         <Collapsible title={`끝난 항목 ${done.length}개`}>
-          <Stack gap="none">
-            {done.map((card) => (
-              <Stack key={`card-${card.item.id}`} gap="none">
-                <DoneItem card={card} />
+          <Stack gap="md">
+            {byProject(done).map(([project, group]) => (
+              <Stack key={`group-done-${project}`} gap="xs">
+                <Text weight="semibold" size="sm" truncate>
+                  {project}
+                </Text>
+                <Stack gap="none">
+                  {group.map((card) => (
+                    <Stack key={`card-${card.item.id}`} gap="none">
+                      <DoneItem card={card} />
+                    </Stack>
+                  ))}
+                </Stack>
               </Stack>
             ))}
           </Stack>
