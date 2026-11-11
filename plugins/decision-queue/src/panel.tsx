@@ -2,19 +2,23 @@
 import {
   atom,
   Badge,
+  Box,
   Button,
-  Card,
+  Callout,
+  Collapsible,
   EmptyState,
-  Heading,
   plugin,
   read,
+  RelativeTime,
   Row,
   set,
   Stack,
   Text,
   Textarea,
   update,
-  type PanelContext
+  type IconName,
+  type PanelContext,
+  type Tone
 } from 'orca'
 import type { Card as QueueCard, Kind, QueueView, Verdict } from './protocol'
 
@@ -26,9 +30,18 @@ const sending = atom<Record<string, boolean>>({})
 const RELAY_GRACE_MS = 30_000
 /** How often an open panel reads the queue itself, in case a worker post never arrived. */
 export const POLL_MS = 5_000
-const showDone = atom(false)
+/** Cards whose one-line note field is open. */
+const noteOpen = atom<Record<string, boolean>>({})
 
-const KIND: Record<Kind, string> = { approve: '승인 요청', decide: '결정', review: '검토', 'send-ready': '발송 준비' }
+const KIND: Record<Kind, { label: string; tone: Tone }> = {
+  approve: { label: '승인 요청', tone: 'accent' },
+  decide: { label: '결정', tone: 'warning' },
+  review: { label: '검토', tone: 'success' },
+  // Red: this one ends with something reaching a customer.
+  'send-ready': { label: '발송 준비', tone: 'danger' }
+}
+/** The verdict that says yes; it gets the filled button. */
+const PRIMARY: Verdict[] = ['approve', 'accept', 'sent']
 const VERDICT: Record<Verdict, string> = {
   approve: '승인',
   reject: '반려',
@@ -46,14 +59,6 @@ const BUTTONS: Record<Kind, Verdict[]> = {
 }
 const NEEDS_NOTE: Verdict[] = ['reject', 'revise', 'instruct']
 
-/** Local month/day hour:minute; answers are stored in UTC, items usually with an offset. */
-const when = (iso: string) => {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
-
 function setError(id: string, message: string): void {
   update(errors, (all) => ({ ...all, [id]: message }))
 }
@@ -61,6 +66,7 @@ function setError(id: string, message: string): void {
 async function answer(id: string, verdict: Verdict, choice?: string): Promise<void> {
   const note = (read(notes)[id] ?? '').trim()
   if (NEEDS_NOTE.includes(verdict) && !note) {
+    update(noteOpen, (all) => ({ ...all, [id]: true }))
     setError(id, `${VERDICT[verdict]}에는 한 줄 지시를 적어 주세요.`)
     return
   }
@@ -102,107 +108,192 @@ export function setup(ctx: PanelContext): () => void {
   return () => clearInterval(poll)
 }
 
+const ms = (iso: string) => {
+  const t = new Date(iso).getTime()
+  return Number.isNaN(t) ? Date.now() : t
+}
+
+function evidenceIcon(path: string): IconName {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  if (['mp4', 'mov', 'm4v'].includes(ext)) return 'play'
+  if (['pdf', 'txt', 'md', 'docx', 'hwp', 'hwpx', 'csv', 'xlsx', 'pptx'].includes(ext)) return 'file-text'
+  return 'file'
+}
+
 function Answers({ card }: { card: QueueCard }) {
   const { id, kind, options } = card.item
   const locked = !!read(sending)[id]
   const current = card.answer
+  const open = !!read(noteOpen)[id]
   return (
-    <Stack gap="xs">
+    <Stack gap="sm">
       <Row gap="xs" wrap>
         {[
           ...(kind === 'decide' ? options ?? [] : []).map((option, i) => (
-            <Button key={`choose-${id}-${i}`} variant={current?.choice === option ? 'solid' : 'outline'} disabled={locked || current?.choice === option} onPress={() => answer(id, 'choose', option)}>
+            <Button
+              key={`choose-${id}-${i}`}
+              variant={current?.choice === option ? 'solid' : 'outline'}
+              tone={current?.choice === option ? 'accent' : undefined}
+              icon={current?.choice === option ? 'check' : undefined}
+              disabled={locked || current?.choice === option}
+              onPress={() => answer(id, 'choose', option)}
+            >
               {option}
             </Button>
           )),
-          ...BUTTONS[kind].map((verdict) => (
-            <Button
-              key={`${verdict}-${id}`}
-              variant={NEEDS_NOTE.includes(verdict) ? 'outline' : 'solid'}
-              tone={verdict === 'reject' ? 'danger' : undefined}
-              disabled={locked || (current?.verdict === verdict && !NEEDS_NOTE.includes(verdict))}
-              onPress={() => answer(id, verdict)}
-            >
-              {VERDICT[verdict]}
-            </Button>
-          )),
-          <Button key={`instruct-${id}`} variant="ghost" disabled={locked} onPress={() => answer(id, 'instruct')}>
-            지시만 보내기
+          ...BUTTONS[kind].map((verdict) => {
+            const chosen = current?.verdict === verdict && !NEEDS_NOTE.includes(verdict)
+            return (
+              <Button
+                key={`${verdict}-${id}`}
+                variant={PRIMARY.includes(verdict) ? 'solid' : 'outline'}
+                tone={PRIMARY.includes(verdict) ? 'accent' : undefined}
+                icon={chosen ? 'check' : undefined}
+                disabled={locked || chosen}
+                onPress={() => answer(id, verdict)}
+              >
+                {VERDICT[verdict]}
+              </Button>
+            )
+          }),
+          <Button key={`instruct-${id}`} variant="ghost" icon="edit" disabled={locked} onPress={() => (open ? answer(id, 'instruct') : update(noteOpen, (all) => ({ ...all, [id]: true })))}>
+            {open ? '지시 보내기' : '지시'}
           </Button>
         ]}
       </Row>
-      <Textarea
-        key={`note-${id}`}
-        label="한 줄 지시"
-        labelHidden
-        rows={2}
-        placeholder="반려 · 고쳐 줘 · 지시에는 한 줄 지시가 필요합니다"
-        defaultValue={read(notes)[id] ?? ''}
-        onChange={(value) => update(notes, (all) => ({ ...all, [id]: value }))}
-      />
+      {open && (
+        <Textarea
+          key={`note-${id}`}
+          label="한 줄 지시"
+          labelHidden
+          rows={2}
+          placeholder="류드에게 보낼 한 줄 지시 (반려 · 고쳐 줘에도 쓰입니다)"
+          defaultValue={read(notes)[id] ?? ''}
+          onChange={(value) => update(notes, (all) => ({ ...all, [id]: value }))}
+        />
+      )}
     </Stack>
+  )
+}
+
+function AnswerState({ card }: { card: QueueCard }) {
+  const a = card.answer
+  if (card.status === 'taken')
+    return (
+      <Callout tone="warning" icon="activity" title="류드가 처리 중">
+        {a ? `답: ${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}` : ''}
+      </Callout>
+    )
+  if (!a) return null
+  const relay = relayText(a)
+  return (
+    <Callout tone={relay?.warn ? 'warning' : 'success'} icon={relay?.warn ? 'warning' : 'check'} title={`답: ${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}`}>
+      <Stack gap="none">
+        {a.note && <Text size="sm">{a.note}</Text>}
+        <Text muted size="xs">{relay ? relay.text : '류드에게 알림 · 처리 기다리는 중'}</Text>
+      </Stack>
+    </Callout>
   )
 }
 
 function QueueItem({ card }: { card: QueueCard }) {
   const { item } = card
+  const kind = KIND[item.kind]
   const error = read(errors)[item.id]
   const answerable = card.status === 'open' || card.status === 'answered'
+  const evidence = item.evidence ?? []
   return (
-    <Card title={`${item.project} · ${item.title}`} description={`${KIND[item.kind]} · ${when(item.createdAt)}`}>
-      <Stack gap="sm">
-        {item.body && <Text>{item.body}</Text>}
-        {item.proposal && <Text weight="medium">제안: {item.proposal}</Text>}
-        {card.stale && <Text tone="warning">항목이 바뀌어 이전 답은 무효입니다. 다시 답해 주세요.</Text>}
-        {item.kind === 'send-ready' && (
-          <Stack gap="xs">
-            <Text muted size="sm">보낼 사람: {item.sender} · 직접 복사해 보낸 뒤 「보냈음」을 누르세요.</Text>
-            <Textarea key={`draft-${item.id}`} label="보낼 글" labelHidden rows={6} value={item.draft ?? ''} />
-          </Stack>
-        )}
-        {(item.evidence ?? []).length > 0 && (
-          <Row gap="xs" wrap>
-            {(item.evidence ?? []).map((e, i) => (
-              <Button key={`evidence-${item.id}-${i}`} size="sm" variant="ghost" icon="file" onPress={() => openEvidence(item.id, i)}>
-                {e.label}
-              </Button>
-            ))}
-          </Row>
-        )}
-        {card.answer && (
-          <Row gap="xs" wrap>
-            <Badge tone="accent">
-              답: {VERDICT[card.answer.verdict]}
-              {card.answer.choice ? ` · ${card.answer.choice}` : ''}
-            </Badge>
-            <Text muted size="xs">{when(card.answer.at)}</Text>
-            {card.answer.note && <Text size="sm">{card.answer.note}</Text>}
-            {(() => {
-              const relay = relayText(card.answer)
-              return relay && (relay.warn ? <Text tone="warning" size="sm">{relay.text}</Text> : <Text muted size="sm">{relay.text}</Text>)
-            })()}
-          </Row>
-        )}
-        {card.status === 'taken' && <Badge tone="warning">처리 중</Badge>}
-        {card.status === 'done' && <Text muted size="sm">끝남{card.stateNote ? ` · ${card.stateNote}` : ''}</Text>}
-        {answerable && <Answers card={card} />}
-        {error && (
-          <Text key={`error-${item.id}`} tone="danger" size="sm">
-            {error}
+    <Box border={card.status === 'open' ? kind.tone : true} radius="md" padding="md" gap="sm" background="card">
+      <Row justify="between" align="center">
+        <Row gap="xs" align="center">
+          <Badge tone={kind.tone}>{kind.label}</Badge>
+          <Text muted size="xs" truncate>
+            {item.project}
           </Text>
-        )}
-      </Stack>
-    </Card>
+        </Row>
+        <Text muted size="xs">
+          <RelativeTime at={ms(item.createdAt)} format="short" />
+        </Text>
+      </Row>
+      <Text weight="semibold">{item.title}</Text>
+      {item.body && (
+        <Text muted size="sm">
+          {item.body}
+        </Text>
+      )}
+      {card.stale && (
+        <Callout tone="warning" icon="warning">
+          항목이 바뀌어 이전 답은 무효입니다. 다시 답해 주세요.
+        </Callout>
+      )}
+      {item.proposal && (
+        <Box background="muted" radius="sm" paddingX="sm" paddingY="xs" direction="row" gap="xs" align="center">
+          <Text size="xs" muted>
+            류드 제안
+          </Text>
+          <Text size="sm" weight="semibold">
+            {item.proposal}
+          </Text>
+        </Box>
+      )}
+      {item.kind === 'send-ready' && (
+        <Stack gap="xs">
+          <Text muted size="xs">
+            {item.sender} 이름으로 직접 복사해 보낸 뒤 「보냈음」을 누르세요.
+          </Text>
+          <Textarea key={`draft-${item.id}`} label="보낼 글" labelHidden rows={4} value={item.draft ?? ''} />
+        </Stack>
+      )}
+      {evidence.length > 0 && (
+        <Row gap="xs" wrap>
+          {evidence.map((e, i) => (
+            <Button key={`evidence-${item.id}-${i}`} size="sm" variant="outline" icon={evidenceIcon(e.path)} onPress={() => openEvidence(item.id, i)}>
+              {e.label}
+            </Button>
+          ))}
+        </Row>
+      )}
+      <AnswerState card={card} />
+      {answerable && <Answers card={card} />}
+      {error && (
+        <Text key={`error-${item.id}`} tone="danger" size="sm">
+          {error}
+        </Text>
+      )}
+    </Box>
   )
 }
 
-function Section({ title, cards }: { title: string; cards: QueueCard[] }) {
+function DoneItem({ card }: { card: QueueCard }) {
+  const a = card.answer
+  return (
+    <Box gap="none" paddingY="xs">
+      <Row justify="between" align="center">
+        <Text size="sm" weight="medium" truncate>
+          {card.item.title}
+        </Text>
+        <Text muted size="xs">
+          <RelativeTime at={ms(card.item.createdAt)} format="short" />
+        </Text>
+      </Row>
+      <Text muted size="xs">
+        {card.item.project}
+        {a ? ` · ${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}` : ''}
+        {card.stateNote ? ` · ${card.stateNote}` : ''}
+      </Text>
+    </Box>
+  )
+}
+
+function Section({ title, tone, cards }: { title: string; tone: Tone; cards: QueueCard[] }) {
   if (!cards.length) return null
   return (
     <Stack gap="sm">
-      <Row gap="xs">
-        <Heading level={3}>{title}</Heading>
-        <Badge>{cards.length}</Badge>
+      <Row gap="xs" align="center">
+        <Text weight="semibold" size="sm">
+          {title}
+        </Text>
+        <Badge tone={tone}>{cards.length}</Badge>
       </Row>
       <Stack gap="sm">
         {cards.map((card) => (
@@ -235,33 +326,36 @@ export default function Panel() {
     )
   const by = (status: string) => view.cards.filter((c) => c.status === status)
   const done = by('done')
+  const active = view.cards.length - done.length
   return (
     <Stack gap="lg">
-      {view.cards.length === 0 && view.invalid.length === 0 && (
+      {active === 0 && view.invalid.length === 0 && (
         <EmptyState icon="check" title="기다리는 결정이 없어요" description="류드가 항목을 올리면 여기와 알림에 나타납니다." />
       )}
-      <Section title="답 기다림" cards={by('open')} />
-      <Section title="답함" cards={by('answered')} />
-      <Section title="처리 중" cards={by('taken')} />
+      <Section title="답 기다림" tone="warning" cards={by('open')} />
+      <Section title="답함" tone="success" cards={by('answered')} />
+      <Section title="처리 중" tone="accent" cards={by('taken')} />
       {done.length > 0 && (
-        <Stack gap="sm">
-          <Button variant="ghost" size="sm" onPress={() => update(showDone, (v) => !v)}>
-            {read(showDone) ? '끝난 항목 접기' : `끝난 항목 ${done.length}개 보기`}
-          </Button>
-          {read(showDone) && <Section title="끝남" cards={done} />}
-        </Stack>
+        <Collapsible title={`끝난 항목 ${done.length}개`}>
+          <Stack gap="none">
+            {done.map((card) => (
+              <Stack key={`card-${card.item.id}`} gap="none">
+                <DoneItem card={card} />
+              </Stack>
+            ))}
+          </Stack>
+        </Collapsible>
       )}
       {view.invalid.length > 0 && (
-        <Stack gap="xs">
-          <Heading level={3}>읽지 못한 항목</Heading>
+        <Callout tone="danger" icon="error" title="읽지 못한 항목">
           <Stack gap="xs">
             {view.invalid.map((bad) => (
-              <Text key={`invalid-${bad.id}`} tone="danger" size="sm">
+              <Text key={`invalid-${bad.id}`} size="sm">
                 {bad.id}: {bad.reason}
               </Text>
             ))}
           </Stack>
-        </Stack>
+        </Callout>
       )}
     </Stack>
   )
