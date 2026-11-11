@@ -53,14 +53,14 @@ async function scan(orca: OrcaWorkerApi): Promise<QueueView> {
   const waiting = cards.filter((c) => c.status === 'open')
   await orca.host.call('statusBar.update', {
     id: BAR,
-    text: `결정 ${waiting.length}`,
+    text: `결재 ${waiting.length}`,
     tone: waiting.length ? 'warning' : 'neutral',
     visible: true
   })
   const seen = new Set(((await orca.storage.get(NOTIFIED)) as string[] | null) ?? [])
   const fresh = waiting.filter((c) => !seen.has(c.item.id))
   for (const card of fresh) {
-    await orca.host.call('notifications.show', { title: `결정 대기 · ${card.item.project}`, body: card.item.title })
+    await orca.host.call('notifications.show', { title: card.item.project, body: card.item.title })
     seen.add(card.item.id)
   }
   if (fresh.length) {

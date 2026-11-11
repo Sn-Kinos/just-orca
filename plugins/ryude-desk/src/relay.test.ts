@@ -1,4 +1,4 @@
-// Which terminal gets the "[결정 대기] <id> 답 있음" line, from `orca terminal list --json` rows.
+// Which terminal gets the "[류드 결재함] <id> 답 있음" line, from `orca terminal list --json` rows.
 import { assert, test } from 'orca/testing'
 import { pickTerminal, type TerminalRow } from './relay'
 

@@ -166,9 +166,9 @@ test('a new waiting item is announced once and counted in the status bar', async
 
   const shown = host.callsOf('notifications.show') as { title: string; body?: string }[]
   assert.equal(shown.length, 1)
-  assert.ok(shown[0].title.includes('Sample Shop'))
+  assert.equal(shown[0].title, 'Sample Shop', 'Orca already puts the plugin key in front')
   const bars = host.callsOf('statusBar.update') as { id: string; text?: string }[]
-  assert.equal(bars.at(-1)?.text, '결정 1')
+  assert.equal(bars.at(-1)?.text, '결재 1')
   await worker.deactivate()
 
   // A restarted worker remembers what it already announced.

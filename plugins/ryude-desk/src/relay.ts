@@ -49,7 +49,7 @@ export async function relayAnswer(cfg: RelayConfig, id: string, log: (message: s
     const fromFile = existsSync(cfg.handleFile) ? readFileSync(cfg.handleFile, 'utf8').trim() || null : null
     const pick = pickTerminal(rows, fromFile, { workspace: cfg.workspace, title: cfg.agentTitle })
     if ('error' in pick) throw new Error(pick.error)
-    const text = `[결정 대기] ${id} 답 있음. 답 파일을 직접 읽고 처리해 줘.`
+    const text = `[류드 결재함] ${id} 답 있음. 답 파일을 직접 읽고 처리해 줘.`
     const sent = JSON.parse(await run(cfg.orcaBin, ['terminal', 'send', '--terminal', pick.handle, '--text', text, '--enter', '--json']))
     const accepted = sent?.ok === true && sent?.result?.send?.accepted === true
     log(`relay ${id} -> ${pick.handle} (${pick.how}): ${accepted ? 'accepted' : 'refused'}`)

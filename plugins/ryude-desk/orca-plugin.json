@@ -1,9 +1,9 @@
 {
   "manifestVersion": 2,
-  "id": "decision-queue",
-  "name": "결정 대기",
-  "version": "0.4.7",
-  "description": "Decisions an orchestrator agent needs from you, answered in the right sidebar.",
+  "id": "ryude-desk",
+  "name": "류드 결재함",
+  "version": "0.5.0",
+  "description": "Ryude's desk: the decisions an orchestrator agent needs from you, answered in the right sidebar.",
   "engines": {
     "orca": ">=1.4.248"
   },
@@ -13,8 +13,8 @@
   "contributes": {
     "panels": [
       {
-        "id": "decision-queue",
-        "title": "결정 대기",
+        "id": "ryude-desk",
+        "title": "류드 결재함",
         "icon": "bell",
         "entry": "src/panel.tsx",
         "ui": "components"
@@ -23,9 +23,9 @@
     "statusBarItems": [
       {
         "id": "waiting",
-        "text": "결정 -",
+        "text": "결재 -",
         "icon": "bell",
-        "tooltip": "오른쪽 사이드바의 결정 대기"
+        "tooltip": "오른쪽 사이드바의 류드 결재함"
       }
     ]
   },
