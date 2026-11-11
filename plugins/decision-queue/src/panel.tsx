@@ -222,7 +222,7 @@ function QueueItem({ card }: { card: QueueCard }) {
         </Callout>
       )}
       {item.proposal && (
-        <Box background="muted" radius="sm" paddingX="sm" paddingY="xs" direction="row" gap="xs" align="center">
+        <Box background="muted" radius="sm" paddingX="md" paddingY="sm" direction="row" gap="xs" align="center">
           <Text size="xs" muted>
             류드 제안
           </Text>
