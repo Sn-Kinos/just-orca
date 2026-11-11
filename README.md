@@ -30,6 +30,17 @@ Orca는 저장소 루트의 `orca-marketplace.json`을 읽습니다. 설치 시�
 
 자세한 사용법은 [plugins/git-log-graph/README.md](plugins/git-log-graph/README.md)를 참고하세요.
 
+### decision-queue (로컬 경로)
+
+현재 Orca Git 소스는 저장소 루트 매니페스트 하나만 읽어서, `decision-queue`는 카탈로그가 아니라 로컬 경로로 설치합니다.
+
+```sh
+git clone https://github.com/Sn-Kinos/just-orca.git
+orca plugin install <클론 경로>/plugins/decision-queue
+```
+
+권한(자체 Node 프로세스, 플러그인 저장소, 알림)을 확인하고 Orca가 알려 주는 `--approve` 지문으로 다시 실행합니다. 큐 폴더 구조와 에이전트 쪽 사용법은 [plugins/decision-queue/README.md](plugins/decision-queue/README.md)에 있습니다.
+
 ### Claude Code · Codex
 
 현재 Claude Code와 Codex 카탈로그에는 등록된 플러그인이 없습니다.
