@@ -301,7 +301,7 @@ function Section({ id, title, cards }: { id: string; title: string; cards: Queue
       </Row>
       <Stack gap="md">
         {byProject(cards).map(([project, group]) => (
-          <Stack key={`group-${id}-${project}`} gap="xs">
+          <Box key={`group-${id}-${project}`} background="muted" radius="lg" padding="sm" gap="sm">
             <Row gap="xs" align="center">
               <Text weight="semibold" truncate>
                 {project}
@@ -319,7 +319,7 @@ function Section({ id, title, cards }: { id: string; title: string; cards: Queue
                 </Stack>
               ))}
             </Stack>
-          </Stack>
+          </Box>
         ))}
       </Stack>
     </Stack>
