@@ -24,6 +24,8 @@ const errors = atom<Record<string, string>>({})
 /** Cards whose answer is on its way to the worker; their buttons are off until it returns. */
 const sending = atom<Record<string, boolean>>({})
 const RELAY_GRACE_MS = 30_000
+/** How often an open panel reads the queue itself, in case a worker post never arrived. */
+export const POLL_MS = 5_000
 const showDone = atom(false)
 
 const KIND: Record<Kind, string> = { approve: '승인 요청', decide: '결정', review: '검토', 'send-ready': '발송 준비' }
@@ -90,9 +92,14 @@ async function openEvidence(id: string, index: number): Promise<void> {
   }
 }
 
-export function setup(ctx: PanelContext): void {
+export function setup(ctx: PanelContext): () => void {
   ctx.subscriptions.push(plugin.on('queue.changed', (view) => set(queue, view)))
-  void plugin.request('queue.list').then((view) => set(queue, view))
+  const refresh = () => void plugin.request('queue.list').then((view) => set(queue, view)).catch(() => undefined)
+  refresh()
+  // Worker posts can stop reaching a panel that was open across a plugin reinstall; reading the
+  // queue again while visible keeps the cards right whatever happened to the posts.
+  const poll = setInterval(() => read(ctx.visible) && refresh(), POLL_MS)
+  return () => clearInterval(poll)
 }
 
 function Answers({ card }: { card: QueueCard }) {

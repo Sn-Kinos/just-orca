@@ -2,6 +2,7 @@
 import { assert, mockHost, mount, test } from 'orca/testing'
 import type { AnswerInput, Card, QueueView } from './protocol'
 import * as panel from './panel'
+import { POLL_MS } from './panel'
 
 const at = '2026-11-11T10:00:00+09:00'
 const cards: Card[] = [
@@ -119,6 +120,20 @@ test('an answer still being relayed reads as sending, an old one as failed', asy
   assert.ok(!view.find({ testId: 'card-DQ-7' })?.text.includes('알리지 못함'))
   assert.ok(view.find({ testId: 'card-DQ-8' })?.text.includes('알리지 못함'))
   await view.unmount()
+})
+
+test('without any worker post the panel still catches up by reading the queue again', async () => {
+  let view: QueueView = { configured: true, cards: [cards[3]], invalid: [] }
+  const host = mockHost({ requests: { 'queue.list': () => view } })
+  const panelView = await mount(panel, { host })
+  assert.ok(panelView.find({ testId: 'card-DQ-4' })?.text.includes('답'))
+  // The agent finishes the item; no queue.changed reaches this panel.
+  view = { configured: true, cards: [{ ...cards[3], status: 'done', stateNote: 'merged' }], invalid: [] }
+  await new Promise((r) => setTimeout(r, POLL_MS + 500))
+  await panelView.settled()
+  assert.equal(panelView.find({ testId: 'accept-DQ-4' }), null, 'no longer answerable')
+  assert.ok(panelView.find({ text: /끝난 항목 1개/ }))
+  await panelView.unmount()
 })
 
 test('a worker post replaces what the panel shows', async () => {
