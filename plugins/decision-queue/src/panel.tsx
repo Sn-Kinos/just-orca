@@ -34,10 +34,10 @@ export const POLL_MS = 5_000
 const noteOpen = atom<Record<string, boolean>>({})
 
 const KIND: Record<Kind, { label: string; tone: Tone }> = {
-  approve: { label: '승인 요청', tone: 'accent' },
-  decide: { label: '결정', tone: 'warning' },
-  review: { label: '검토', tone: 'success' },
-  // Red: this one ends with something reaching a customer.
+  approve: { label: '승인 요청', tone: 'neutral' },
+  decide: { label: '결정', tone: 'neutral' },
+  review: { label: '검토', tone: 'neutral' },
+  // The only coloured kind: this one ends with something reaching a customer.
   'send-ready': { label: '발송 준비', tone: 'danger' }
 }
 /** The verdict that says yes; it gets the filled button. */
@@ -67,7 +67,7 @@ async function answer(id: string, verdict: Verdict, choice?: string): Promise<vo
   const note = (read(notes)[id] ?? '').trim()
   if (NEEDS_NOTE.includes(verdict) && !note) {
     update(noteOpen, (all) => ({ ...all, [id]: true }))
-    setError(id, `${VERDICT[verdict]}에는 한 줄 지시를 적어 주세요.`)
+    setError(id, `${VERDICT[verdict]}에는 한 줄 지시를 적어 주세요`)
     return
   }
   if (read(sending)[id]) return
@@ -180,7 +180,7 @@ function AnswerState({ card }: { card: QueueCard }) {
   const a = card.answer
   if (card.status === 'taken')
     return (
-      <Callout tone="warning" icon="activity" title="류드가 처리 중">
+      <Callout tone="neutral" icon="activity" title="류드가 처리 중">
         {a ? `답: ${VERDICT[a.verdict]}${a.choice ? ` · ${a.choice}` : ''}` : ''}
       </Callout>
     )
@@ -203,7 +203,7 @@ function QueueItem({ card }: { card: QueueCard }) {
   const answerable = card.status === 'open' || card.status === 'answered'
   const evidence = item.evidence ?? []
   return (
-    <Box border={card.status === 'open' ? kind.tone : true} radius="md" padding="md" gap="sm" background="card">
+    <Box border radius="md" padding="md" gap="sm" background="card">
       <Row justify="between" align="center">
         <Row gap="xs" align="center">
           <Badge tone={kind.tone}>{kind.label}</Badge>
@@ -231,7 +231,7 @@ function QueueItem({ card }: { card: QueueCard }) {
           <Text size="xs" muted>
             류드 제안
           </Text>
-          <Text size="sm" weight="semibold">
+          <Text size="sm" weight="medium">
             {item.proposal}
           </Text>
         </Box>
@@ -239,7 +239,7 @@ function QueueItem({ card }: { card: QueueCard }) {
       {item.kind === 'send-ready' && (
         <Stack gap="xs">
           <Text muted size="xs">
-            {item.sender} 이름으로 직접 복사해 보낸 뒤 「보냈음」을 누르세요.
+            {item.sender} 이름으로 직접 복사해 보낸 뒤 「보냈음」을 눌러 주세요
           </Text>
           <Textarea key={`draft-${item.id}`} label="보낼 글" labelHidden rows={4} value={item.draft ?? ''} />
         </Stack>
@@ -285,15 +285,17 @@ function DoneItem({ card }: { card: QueueCard }) {
   )
 }
 
-function Section({ title, tone, cards }: { title: string; tone: Tone; cards: QueueCard[] }) {
+function Section({ title, cards }: { title: string; cards: QueueCard[] }) {
   if (!cards.length) return null
   return (
     <Stack gap="sm">
       <Row gap="xs" align="center">
-        <Text weight="semibold" size="sm">
+        <Text muted weight="medium" size="sm">
           {title}
         </Text>
-        <Badge tone={tone}>{cards.length}</Badge>
+        <Text muted size="sm">
+          {cards.length}
+        </Text>
       </Row>
       <Stack gap="sm">
         {cards.map((card) => (
@@ -319,7 +321,7 @@ export default function Panel() {
         <EmptyState
           icon="bell"
           title="아직 이 Mac에서 쓰지 않았어요"
-          description="누르면 ~/.local/state/ryude/decisions 를 지켜보고, 답하면 류드 터미널에 항목 ID를 알립니다."
+          description="누르면 ~/.local/state/ryude/decisions 를 지켜보고, 답하면 류드 터미널에 항목 ID를 알립니다"
         />
         <Button onPress={startHere}>이 Mac에서 쓰기 시작</Button>
       </Stack>
@@ -330,11 +332,11 @@ export default function Panel() {
   return (
     <Stack gap="lg">
       {active === 0 && view.invalid.length === 0 && (
-        <EmptyState icon="check" title="기다리는 결정이 없어요" description="류드가 항목을 올리면 여기와 알림에 나타납니다." />
+        <EmptyState icon="check" title="기다리는 결정이 없어요" description="류드가 항목을 올리면 여기와 알림에 나타납니다" />
       )}
-      <Section title="답 기다림" tone="warning" cards={by('open')} />
-      <Section title="답함" tone="success" cards={by('answered')} />
-      <Section title="처리 중" tone="accent" cards={by('taken')} />
+      <Section title="답 기다림" cards={by('open')} />
+      <Section title="답함" cards={by('answered')} />
+      <Section title="처리 중" cards={by('taken')} />
       {done.length > 0 && (
         <Collapsible title={`끝난 항목 ${done.length}개`}>
           <Stack gap="none">
