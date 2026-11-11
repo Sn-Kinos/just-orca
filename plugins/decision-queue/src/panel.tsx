@@ -206,10 +206,10 @@ function QueueItem({ card }: { card: QueueCard }) {
     <Box border radius="md" padding="md" gap="sm" background="card">
       <Row justify="between" align="center">
         <Row gap="xs" align="center">
-          <Badge tone={kind.tone}>{kind.label}</Badge>
-          <Text muted size="xs" truncate>
+          <Text size="sm" weight="medium" truncate>
             {item.project}
           </Text>
+          <Badge tone={kind.tone}>{kind.label}</Badge>
         </Row>
         <Text muted size="xs">
           <RelativeTime at={ms(item.createdAt)} format="short" />

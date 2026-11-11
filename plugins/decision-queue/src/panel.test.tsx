@@ -136,6 +136,14 @@ test('without any worker post the panel still catches up by reading the queue ag
   await panelView.unmount()
 })
 
+test('each card leads with its project name', async () => {
+  const { host } = setup({ configured: true, cards, invalid: [] })
+  const view = await mount(panel, { host })
+  const card = view.find({ testId: 'card-DQ-2' })
+  assert.ok(card?.text.startsWith('Demo Clinic'), card?.text)
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })
