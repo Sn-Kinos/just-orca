@@ -204,13 +204,19 @@ function QueueItem({ card }: { card: QueueCard }) {
   const evidence = item.evidence ?? []
   return (
     <Box radius="md" padding="md" gap="sm" background="card">
-      <Row justify="between" align="center">
-        <Badge tone={kind.tone}>{kind.label}</Badge>
-        <Text muted size="xs">
-          <RelativeTime at={ms(item.createdAt)} format="short" />
-        </Text>
-      </Row>
-      <Text weight="semibold">{item.title}</Text>
+      <Box direction="row" gap="sm" align="start">
+        <Box shrink={false}>
+          <Badge tone={kind.tone}>{kind.label}</Badge>
+        </Box>
+        <Box grow>
+          <Text weight="semibold">{item.title}</Text>
+        </Box>
+        <Box shrink={false}>
+          <Text muted size="xs">
+            <RelativeTime at={ms(item.createdAt)} format="short" />
+          </Text>
+        </Box>
+      </Box>
       {item.body && (
         <Text muted size="sm">
           {item.body}
