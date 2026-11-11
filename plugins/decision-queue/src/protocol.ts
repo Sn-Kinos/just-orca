@@ -26,7 +26,8 @@ export type Answer = {
   choice?: string
   note?: string
   at: string
-  relayed: boolean
+  /** null while the worker is still telling the agent; then true or false. */
+  relayed: boolean | null
 }
 export type Card = {
   item: Item

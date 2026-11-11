@@ -16,6 +16,16 @@ const BAR = 'waiting'
 
 let watcher: FSWatcher | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
+/** One answer at a time per item, so two presses cannot both write and both relay. */
+const busy = new Map<string, Promise<unknown>>()
+
+function oneAtATime<T>(id: string, work: () => Promise<T>): Promise<T> {
+  const next = (busy.get(id) ?? Promise.resolve()).catch(() => undefined).then(work)
+  busy.set(id, next)
+  return next.finally(() => {
+    if (busy.get(id) === next) busy.delete(id)
+  })
+}
 
 /** This Mac's defaults; setup stores them, and a config saved before a field existed gets it here. */
 function defaults(): Config {
@@ -93,9 +103,11 @@ export default async function activate(orca: OrcaWorkerApi): Promise<void> {
   orca.panels.handle('queue.answer', async (input: AnswerInput) => {
     const cfg = await config(orca)
     if (!cfg) throw Object.assign(new Error('set up the queue first'), { code: 'conflict' })
-    writeAnswer(cfg.dir, input)
-    markRelayed(cfg.dir, input.id, await relayAnswer(cfg, input.id, (m) => orca.log(m)))
-    return broadcast(orca)
+    return oneAtATime(input.id, async () => {
+      const { changed } = writeAnswer(cfg.dir, input)
+      if (changed) markRelayed(cfg.dir, input.id, await relayAnswer(cfg, input.id, (m) => orca.log(m)))
+      return broadcast(orca)
+    })
   })
 
   orca.panels.handle('evidence.open', async ({ id, index }) => {

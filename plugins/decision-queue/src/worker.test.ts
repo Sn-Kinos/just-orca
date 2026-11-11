@@ -99,6 +99,35 @@ test('an answer is written, the agent terminal gets only the id, and panels hear
   await worker.deactivate()
 })
 
+test('the answer is on disk, marked as being relayed, before the agent hears of it', async () => {
+  const q = setupQueue()
+  const id = 'DQ-20261111-100000-ffff'
+  putItem(q.dir, id)
+  // The stand-in orca copies answer.json into its log at the moment it is asked to send.
+  const bin = q.config.orcaBin
+  writeFileSync(bin, readFileSync(bin, 'utf8').replace("for a in", `cat '${join(q.dir, id, 'answer.json')}' >> '${q.log}.answer'; for a in`))
+  const host = mockHost({ results: RESULTS, storage: { config: q.config } })
+  const worker = await mountWorker(main, { host })
+  await worker.request('queue.answer', { id, verdict: 'approve' })
+  assert.equal(JSON.parse(readFileSync(`${q.log}.answer`, 'utf8')).relayed, null)
+  await worker.deactivate()
+})
+
+test('the same answer twice, even at once, tells the agent once', async () => {
+  const q = setupQueue()
+  const id = 'DQ-20261111-100000-gggg'
+  putItem(q.dir, id)
+  const host = mockHost({ results: RESULTS, storage: { config: q.config } })
+  const worker = await mountWorker(main, { host })
+  await Promise.all([
+    worker.request('queue.answer', { id, verdict: 'approve' }),
+    worker.request('queue.answer', { id, verdict: 'approve' })
+  ])
+  await worker.request('queue.answer', { id, verdict: 'approve' })
+  assert.equal(sentArgs(q).filter((a) => a === 'send').length, 1)
+  await worker.deactivate()
+})
+
 test('a changed terminal id is found by the agent name in its workspace', async () => {
   const q = setupQueue([{ handle: 'term_after-restart', title: '✳ 류드' }])
   const id = 'DQ-20261111-100000-eeee'

@@ -90,7 +90,8 @@ export function loadQueue(dir: string): { cards: Card[]; invalid: Invalid[] } {
   return { cards: cards.filter((c) => !done.includes(c)), invalid }
 }
 
-export function writeAnswer(dir: string, input: AnswerInput, now = new Date()): Answer {
+/** Writes the answer unless the same one is already there; `changed` says which. */
+export function writeAnswer(dir: string, input: AnswerInput, now = new Date()): { answer: Answer; changed: boolean } {
   const { item, hash } = readItem(dir, input.id)
   const state = readState(dir, input.id)
   if (state.status === 'taken' || state.status === 'done')
@@ -102,11 +103,16 @@ export function writeAnswer(dir: string, input: AnswerInput, now = new Date()): 
     throw Object.assign(new Error(`verdict ${input.verdict} needs a note`), { code: 'invalid_params' })
   if (input.verdict === 'choose' && !item.options?.includes(input.choice ?? ''))
     throw Object.assign(new Error(`choice must be one of the options`), { code: 'invalid_params' })
-  const answer: Answer = { itemHash: hash, verdict: input.verdict, at: now.toISOString(), relayed: false }
-  if (input.verdict === 'choose') answer.choice = input.choice
+  const choice = input.verdict === 'choose' ? input.choice : undefined
+  const path = join(dir, input.id, 'answer.json')
+  const existing = readJson(path) as Answer | undefined
+  if (existing && existing.itemHash === hash && existing.verdict === input.verdict && existing.choice === choice && (existing.note ?? '') === note)
+    return { answer: existing, changed: false }
+  const answer: Answer = { itemHash: hash, verdict: input.verdict, at: now.toISOString(), relayed: null }
+  if (choice !== undefined) answer.choice = choice
   if (note) answer.note = note
-  writeJson(join(dir, input.id, 'answer.json'), answer)
-  return answer
+  writeJson(path, answer)
+  return { answer, changed: true }
 }
 
 export function markRelayed(dir: string, id: string, relayed: boolean): void {

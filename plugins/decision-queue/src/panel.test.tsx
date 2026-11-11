@@ -82,6 +82,45 @@ test('answered cards say whether the agent was told; taken cards are read-only',
   await view.unmount()
 })
 
+test('the current answer cannot be pressed again, and a card is locked while its answer is sent', async () => {
+  let release: () => void = () => {}
+  const answers: AnswerInput[] = []
+  const host = mockHost({
+    requests: {
+      'queue.list': () => ({ configured: true, cards, invalid: [] }),
+      'queue.answer': (input: AnswerInput) => {
+        answers.push(input)
+        return new Promise<QueueView>((resolve) => (release = () => resolve({ configured: true, cards, invalid: [] })))
+      }
+    }
+  })
+  const view = await mount(panel, { host })
+  assert.equal(view.find({ testId: 'accept-DQ-4' })?.disabled, true, 'DQ-4 is already accepted')
+  assert.equal(view.find({ testId: 'revise-DQ-4' })?.disabled, false)
+
+  // press resolves only once the panel settles, which waits for the held request; check before.
+  const pending = view.press({ testId: 'approve-DQ-1' })
+  await new Promise((r) => setTimeout(r, 50))
+  assert.equal(view.find({ testId: 'approve-DQ-1' })?.disabled, true)
+  assert.equal(view.find({ testId: 'reject-DQ-1' })?.disabled, true)
+  release()
+  await pending
+  assert.equal(answers.length, 1)
+  await view.unmount()
+})
+
+test('an answer still being relayed reads as sending, an old one as failed', async () => {
+  const now = new Date().toISOString()
+  const sending: Card = { item: { ...cards[0].item, id: 'DQ-7' }, status: 'answered', answer: { itemHash: 'h', verdict: 'approve', at: now, relayed: null } }
+  const stuck: Card = { item: { ...cards[0].item, id: 'DQ-8' }, status: 'answered', answer: { itemHash: 'h', verdict: 'approve', at: '2026-11-11T00:00:00Z', relayed: null } }
+  const { host } = setup({ configured: true, cards: [sending, stuck], invalid: [] })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ testId: 'card-DQ-7' })?.text.includes('알리는 중'))
+  assert.ok(!view.find({ testId: 'card-DQ-7' })?.text.includes('알리지 못함'))
+  assert.ok(view.find({ testId: 'card-DQ-8' })?.text.includes('알리지 못함'))
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })

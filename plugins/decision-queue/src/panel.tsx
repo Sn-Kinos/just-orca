@@ -21,6 +21,9 @@ import type { Card as QueueCard, Kind, QueueView, Verdict } from './protocol'
 const queue = atom<QueueView | null>(null)
 const notes = atom<Record<string, string>>({})
 const errors = atom<Record<string, string>>({})
+/** Cards whose answer is on its way to the worker; their buttons are off until it returns. */
+const sending = atom<Record<string, boolean>>({})
+const RELAY_GRACE_MS = 30_000
 const showDone = atom(false)
 
 const KIND: Record<Kind, string> = { approve: '승인 요청', decide: '결정', review: '검토', 'send-ready': '발송 준비' }
@@ -59,13 +62,24 @@ async function answer(id: string, verdict: Verdict, choice?: string): Promise<vo
     setError(id, `${VERDICT[verdict]}에는 한 줄 지시를 적어 주세요.`)
     return
   }
+  if (read(sending)[id]) return
   setError(id, '')
+  update(sending, (all) => ({ ...all, [id]: true }))
   try {
     const input = { id, verdict, ...(choice !== undefined ? { choice } : {}), ...(note ? { note } : {}) }
     set(queue, await plugin.request('queue.answer', input))
   } catch (e) {
     setError(id, String((e as Error).message ?? e))
+  } finally {
+    update(sending, (all) => ({ ...all, [id]: false }))
   }
+}
+
+/** What the card says about telling the agent; null right after an answer means it is on its way. */
+function relayText(answer: { relayed: boolean | null; at: string }): { text: string; warn: boolean } | null {
+  if (answer.relayed === true) return null
+  if (answer.relayed === null && Date.now() - new Date(answer.at).getTime() < RELAY_GRACE_MS) return { text: '류드에게 알리는 중…', warn: false }
+  return { text: '류드에게 알리지 못함', warn: true }
 }
 
 async function openEvidence(id: string, index: number): Promise<void> {
@@ -83,12 +97,14 @@ export function setup(ctx: PanelContext): void {
 
 function Answers({ card }: { card: QueueCard }) {
   const { id, kind, options } = card.item
+  const locked = !!read(sending)[id]
+  const current = card.answer
   return (
     <Stack gap="xs">
       <Row gap="xs" wrap>
         {[
           ...(kind === 'decide' ? options ?? [] : []).map((option, i) => (
-            <Button key={`choose-${id}-${i}`} variant={card.answer?.choice === option ? 'solid' : 'outline'} onPress={() => answer(id, 'choose', option)}>
+            <Button key={`choose-${id}-${i}`} variant={current?.choice === option ? 'solid' : 'outline'} disabled={locked || current?.choice === option} onPress={() => answer(id, 'choose', option)}>
               {option}
             </Button>
           )),
@@ -97,12 +113,13 @@ function Answers({ card }: { card: QueueCard }) {
               key={`${verdict}-${id}`}
               variant={NEEDS_NOTE.includes(verdict) ? 'outline' : 'solid'}
               tone={verdict === 'reject' ? 'danger' : undefined}
+              disabled={locked || (current?.verdict === verdict && !NEEDS_NOTE.includes(verdict))}
               onPress={() => answer(id, verdict)}
             >
               {VERDICT[verdict]}
             </Button>
           )),
-          <Button key={`instruct-${id}`} variant="ghost" onPress={() => answer(id, 'instruct')}>
+          <Button key={`instruct-${id}`} variant="ghost" disabled={locked} onPress={() => answer(id, 'instruct')}>
             지시만 보내기
           </Button>
         ]}
@@ -153,7 +170,10 @@ function QueueItem({ card }: { card: QueueCard }) {
             </Badge>
             <Text muted size="xs">{when(card.answer.at)}</Text>
             {card.answer.note && <Text size="sm">{card.answer.note}</Text>}
-            {!card.answer.relayed && <Text tone="warning" size="sm">류드에게 알리지 못함</Text>}
+            {(() => {
+              const relay = relayText(card.answer)
+              return relay && (relay.warn ? <Text tone="warning" size="sm">{relay.text}</Text> : <Text muted size="sm">{relay.text}</Text>)
+            })()}
           </Row>
         )}
         {card.status === 'taken' && <Badge tone="warning">처리 중</Badge>}

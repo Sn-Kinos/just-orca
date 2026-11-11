@@ -72,18 +72,35 @@ test('an answer counts only while the item is unchanged', () => {
   assert.equal(card.stale, true)
 })
 
-test('the answer records the item hash and starts unrelayed', () => {
+test('the answer records the item hash and starts as being relayed', () => {
   const dir = queueDir()
   const id = 'DQ-20261111-100000-gggg'
   const raw = putItem(dir, approve(id))
-  const answer = writeAnswer(dir, { id, verdict: 'reject', note: 'wait for the review' }, new Date('2026-11-11T12:00:00Z'))
+  const { answer, changed } = writeAnswer(dir, { id, verdict: 'reject', note: 'wait for the review' }, new Date('2026-11-11T12:00:00Z'))
+  assert.equal(changed, true)
   assert.equal(answer.itemHash, hashOf(Buffer.from(raw)))
-  assert.equal(answer.relayed, false)
+  assert.equal(answer.relayed, null)
   const onDisk = JSON.parse(readFileSync(join(dir, id, 'answer.json'), 'utf8'))
   assert.deepEqual(onDisk, answer)
 
   markRelayed(dir, id, true)
   assert.equal(loadQueue(dir).cards[0].answer?.relayed, true)
+})
+
+test('pressing the same answer again changes nothing', () => {
+  const dir = queueDir()
+  const id = 'DQ-20261111-100000-llll'
+  putItem(dir, approve(id))
+  writeAnswer(dir, { id, verdict: 'approve' }, new Date('2026-11-11T12:00:00Z'))
+  markRelayed(dir, id, true)
+  const before = readFileSync(join(dir, id, 'answer.json'), 'utf8')
+  const again = writeAnswer(dir, { id, verdict: 'approve' }, new Date('2026-11-11T12:05:00Z'))
+  assert.equal(again.changed, false)
+  assert.equal(readFileSync(join(dir, id, 'answer.json'), 'utf8'), before)
+
+  const other = writeAnswer(dir, { id, verdict: 'reject', note: 'not yet' }, new Date('2026-11-11T12:06:00Z'))
+  assert.equal(other.changed, true)
+  assert.equal(other.answer.verdict, 'reject')
 })
 
 test('verdicts are checked against the kind', () => {
@@ -96,7 +113,7 @@ test('verdicts are checked against the kind', () => {
   const pick = 'DQ-20261111-100000-iiii'
   putItem(dir, { ...approve(pick), kind: 'decide', options: ['Plan A', 'Plan B'] })
   assert.throws(() => writeAnswer(dir, { id: pick, verdict: 'choose', choice: 'Plan C' }), /choice/)
-  assert.equal(writeAnswer(dir, { id: pick, verdict: 'choose', choice: 'Plan B' }).choice, 'Plan B')
+  assert.equal(writeAnswer(dir, { id: pick, verdict: 'choose', choice: 'Plan B' }).answer.choice, 'Plan B')
 
   assert.throws(() => writeAnswer(dir, { id: 'DQ-NOPE', verdict: 'approve' }), /item/)
   assert.throws(() => writeAnswer(dir, { id: '../escape', verdict: 'approve' }), /id/)
