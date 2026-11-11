@@ -132,8 +132,8 @@ function Answers({ card }: { card: QueueCard }) {
           ...(kind === 'decide' ? options ?? [] : []).map((option, i) => (
             <Button
               key={`choose-${id}-${i}`}
-              variant={current?.choice === option ? 'solid' : 'outline'}
-              tone={current?.choice === option ? 'accent' : undefined}
+              variant="solid"
+              tone={current?.choice === option ? 'accent' : 'neutral'}
               icon={current?.choice === option ? 'check' : undefined}
               disabled={locked || current?.choice === option}
               onPress={() => answer(id, 'choose', option)}
@@ -146,8 +146,8 @@ function Answers({ card }: { card: QueueCard }) {
             return (
               <Button
                 key={`${verdict}-${id}`}
-                variant={PRIMARY.includes(verdict) ? 'solid' : 'outline'}
-                tone={PRIMARY.includes(verdict) ? 'accent' : undefined}
+                variant="solid"
+                tone={PRIMARY.includes(verdict) ? 'accent' : 'neutral'}
                 icon={chosen ? 'check' : undefined}
                 disabled={locked || chosen}
                 onPress={() => answer(id, verdict)}
@@ -242,7 +242,7 @@ function QueueItem({ card }: { card: QueueCard }) {
       {evidence.length > 0 && (
         <Row gap="xs" wrap>
           {evidence.map((e, i) => (
-            <Button key={`evidence-${item.id}-${i}`} size="sm" variant="outline" icon={evidenceIcon(e.path)} onPress={() => openEvidence(item.id, i)}>
+            <Button key={`evidence-${item.id}-${i}`} size="sm" variant="solid" tone="neutral" icon={evidenceIcon(e.path)} onPress={() => openEvidence(item.id, i)}>
               {e.label}
             </Button>
           ))}
