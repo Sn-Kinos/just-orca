@@ -136,11 +136,16 @@ test('without any worker post the panel still catches up by reading the queue ag
   await panelView.unmount()
 })
 
-test('each card leads with its project name', async () => {
+test('cards are grouped by project under each section, the project named once', async () => {
   const { host } = setup({ configured: true, cards, invalid: [] })
   const view = await mount(panel, { host })
-  const card = view.find({ testId: 'card-DQ-2' })
-  assert.ok(card?.text.startsWith('Demo Clinic'), card?.text)
+  // DQ-2 and DQ-3 are both Demo Clinic and both waiting: one group holding both cards.
+  const group = view.find({ testId: 'group-open-Demo Clinic' })
+  assert.ok(group, 'a Demo Clinic group under 답 기다림')
+  assert.ok(group?.text.includes('Login method') && group?.text.includes('Reply about the schedule'))
+  assert.ok(view.find({ testId: 'group-open-Sample Shop' })?.text.includes('Deploy staging'))
+  // The card itself no longer repeats the project name.
+  assert.ok(!view.find({ testId: 'card-DQ-2' })?.text.includes('Demo Clinic'))
   await view.unmount()
 })
 

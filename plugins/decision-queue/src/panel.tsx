@@ -205,12 +205,7 @@ function QueueItem({ card }: { card: QueueCard }) {
   return (
     <Box border radius="md" padding="md" gap="sm" background="card">
       <Row justify="between" align="center">
-        <Row gap="xs" align="center">
-          <Text size="sm" weight="medium" truncate>
-            {item.project}
-          </Text>
-          <Badge tone={kind.tone}>{kind.label}</Badge>
-        </Row>
+        <Badge tone={kind.tone}>{kind.label}</Badge>
         <Text muted size="xs">
           <RelativeTime at={ms(item.createdAt)} format="short" />
         </Text>
@@ -285,10 +280,17 @@ function DoneItem({ card }: { card: QueueCard }) {
   )
 }
 
-function Section({ title, cards }: { title: string; cards: QueueCard[] }) {
+/** Projects in the order of their newest card, each with its cards newest first. */
+function byProject(cards: QueueCard[]): [string, QueueCard[]][] {
+  const groups = new Map<string, QueueCard[]>()
+  for (const card of cards) groups.set(card.item.project, [...(groups.get(card.item.project) ?? []), card])
+  return [...groups]
+}
+
+function Section({ id, title, cards }: { id: string; title: string; cards: QueueCard[] }) {
   if (!cards.length) return null
   return (
-    <Stack gap="sm">
+    <Stack gap="md">
       <Row gap="xs" align="center">
         <Text muted weight="medium" size="sm">
           {title}
@@ -297,10 +299,26 @@ function Section({ title, cards }: { title: string; cards: QueueCard[] }) {
           {cards.length}
         </Text>
       </Row>
-      <Stack gap="sm">
-        {cards.map((card) => (
-          <Stack key={`card-${card.item.id}`} gap="none">
-            <QueueItem card={card} />
+      <Stack gap="md">
+        {byProject(cards).map(([project, group]) => (
+          <Stack key={`group-${id}-${project}`} gap="xs">
+            <Row gap="xs" align="center">
+              <Text weight="semibold" truncate>
+                {project}
+              </Text>
+              {group.length > 1 && (
+                <Text muted size="sm">
+                  {group.length}
+                </Text>
+              )}
+            </Row>
+            <Stack gap="sm">
+              {group.map((card) => (
+                <Stack key={`card-${card.item.id}`} gap="none">
+                  <QueueItem card={card} />
+                </Stack>
+              ))}
+            </Stack>
           </Stack>
         ))}
       </Stack>
@@ -334,9 +352,9 @@ export default function Panel() {
       {active === 0 && view.invalid.length === 0 && (
         <EmptyState icon="check" title="기다리는 결정이 없어요" description="류드가 항목을 올리면 여기와 알림에 나타납니다" />
       )}
-      <Section title="답 기다림" cards={by('open')} />
-      <Section title="답함" cards={by('answered')} />
-      <Section title="처리 중" cards={by('taken')} />
+      <Section id="open" title="답 기다림" cards={by('open')} />
+      <Section id="answered" title="답함" cards={by('answered')} />
+      <Section id="taken" title="처리 중" cards={by('taken')} />
       {done.length > 0 && (
         <Collapsible title={`끝난 항목 ${done.length}개`}>
           <Stack gap="none">
