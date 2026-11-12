@@ -8,7 +8,7 @@
 | 플러그인 | 기능 | 지원 앱 |
 | --- | --- | --- |
 | [git-log-graph](plugins/git-log-graph) | 워크트리와 모든 서브모듈의 커밋 그래프를 Orca 브라우저 탭에서 보기 (`⌘⌥L`) | Orca |
-| [ryude-desk](plugins/ryude-desk) | 류드 결재함: 오케스트레이터 에이전트가 올린 결정(승인·선택·검토·발송 준비)을 오른쪽 사이드바에서 처리 | Orca (로컬 경로 설치) |
+| [ryude-desk](plugins/ryude-desk) | 류드 결재함: 오케스트레이터 에이전트가 올린 결정(승인·선택·검토·발송 준비)을 오른쪽 사이드바에서 처리 | Orca (`catalog` 브랜치) |
 
 ## 설치
 
@@ -30,16 +30,16 @@ Orca는 저장소 루트의 `orca-marketplace.json`을 읽습니다. 설치 시�
 
 자세한 사용법은 [plugins/git-log-graph/README.md](plugins/git-log-graph/README.md)를 참고하세요.
 
-### ryude-desk (로컬 경로)
+### ryude-desk (카탈로그)
 
-현재 Orca Git 소스는 저장소 루트 매니페스트 하나만 읽어서, `ryude-desk`는 카탈로그가 아니라 로컬 경로로 설치합니다.
+`ryude-desk`는 새 매니페스트 형식이라, 이 저장소의 `catalog` 브랜치에 있는 카탈로그로 설치합니다.
 
 ```sh
-git clone https://github.com/Sn-Kinos/just-orca.git
-orca plugin install <클론 경로>/plugins/ryude-desk
+orca plugin catalog add Sn-Kinos/just-orca --ref catalog
+orca plugin install sn-kinos.ryude-desk
 ```
 
-권한(자체 Node 프로세스, 플러그인 저장소, 알림)을 확인하고 Orca가 알려 주는 `--approve` 지문으로 다시 실행합니다. 큐 폴더 구조와 에이전트 쪽 사용법은 [plugins/ryude-desk/README.md](plugins/ryude-desk/README.md)에 있습니다.
+두 명령 모두 Orca가 알려 주는 `--approve` 지문으로 다시 실행합니다. 큐 폴더 구조와 에이전트 쪽 사용법은 [plugins/ryude-desk/README.md](plugins/ryude-desk/README.md)에 있습니다. 새 버전은 `main`에 올린 뒤 `catalog` 브랜치의 `orca-catalog.json`에 릴리스 항목을 더해야 설치·자동 업데이트됩니다.
 
 ### Claude Code · Codex
 
