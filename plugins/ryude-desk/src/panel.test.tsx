@@ -199,6 +199,15 @@ test('line breaks in the body and proposal are kept, and long options get a full
   await view.unmount()
 })
 
+test('each card offers 필요 없음, which answers dismiss with no note', async () => {
+  const { host, answers } = setup({ configured: true, cards, invalid: [] })
+  const view = await mount(panel, { host })
+  await view.press({ testId: 'dismiss-DQ-3' })
+  assert.deepEqual(answers.at(-1), { id: 'DQ-3', verdict: 'dismiss' })
+  assert.ok(view.find({ testId: 'dismiss-DQ-2' }), 'decide cards have it too')
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })

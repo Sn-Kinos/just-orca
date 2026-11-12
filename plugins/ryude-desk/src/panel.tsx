@@ -51,7 +51,8 @@ const VERDICT: Record<Verdict, string> = {
   accept: '받아들임',
   revise: '고쳐 줘',
   sent: '보냈음',
-  instruct: '지시'
+  instruct: '지시',
+  dismiss: '필요 없음'
 }
 const BUTTONS: Record<Kind, Verdict[]> = {
   approve: ['approve', 'reject'],
@@ -167,6 +168,9 @@ function Answers({ card }: { card: QueueCard }) {
               </Button>
             )
           }),
+          <Button key={`dismiss-${id}`} variant="ghost" icon="close" disabled={locked || current?.verdict === 'dismiss'} onPress={() => answer(id, 'dismiss')}>
+            필요 없음
+          </Button>,
           <Button key={`instruct-${id}`} variant="ghost" icon="edit" disabled={locked} onPress={() => (open ? answer(id, 'instruct') : update(noteOpen, (all) => ({ ...all, [id]: true })))}>
             {open ? '지시 보내기' : '지시'}
           </Button>,

@@ -7,10 +7,10 @@ import type { Answer, AnswerInput, Card, Invalid, Item, Kind, Status, Verdict } 
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
 const KINDS: Record<Kind, Verdict[]> = {
-  approve: ['approve', 'reject', 'instruct'],
-  decide: ['choose', 'instruct'],
-  review: ['accept', 'revise', 'instruct'],
-  'send-ready': ['sent', 'revise', 'instruct']
+  approve: ['approve', 'reject', 'instruct', 'dismiss'],
+  decide: ['choose', 'instruct', 'dismiss'],
+  review: ['accept', 'revise', 'instruct', 'dismiss'],
+  'send-ready': ['sent', 'revise', 'instruct', 'dismiss']
 }
 const NEEDS_NOTE: Verdict[] = ['reject', 'revise', 'instruct']
 const OPENABLE = new Set(

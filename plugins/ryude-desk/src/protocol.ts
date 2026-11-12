@@ -3,7 +3,7 @@
 export {}
 
 export type Kind = 'approve' | 'decide' | 'review' | 'send-ready'
-export type Verdict = 'approve' | 'reject' | 'choose' | 'accept' | 'revise' | 'sent' | 'instruct'
+export type Verdict = 'approve' | 'reject' | 'choose' | 'accept' | 'revise' | 'sent' | 'instruct' | 'dismiss'
 export type Status = 'open' | 'answered' | 'taken' | 'done'
 
 export type Evidence = { label: string; path: string }

@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "ryude-desk",
   "name": "류드 결재함",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Ryude's desk: the decisions an orchestrator agent needs from you, answered in the right sidebar.",
   "engines": {
     "orca": ">=1.4.248"

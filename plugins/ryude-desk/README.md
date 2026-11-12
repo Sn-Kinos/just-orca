@@ -67,12 +67,12 @@ Orca 플러그인 API의 `terminal.sendText`는 지금 보고 있는 작업 공�
 
 | 종류 | 고를 수 있는 `verdict` |
 | --- | --- |
-| `approve` | `approve`, `reject`, `instruct` |
-| `decide` | `choose`(이때 `choice`는 `options` 중 하나), `instruct` |
-| `review` | `accept`, `revise`, `instruct` |
-| `send-ready` | `sent`, `revise`, `instruct` |
+| `approve` | `approve`, `reject`, `instruct`, `dismiss` |
+| `decide` | `choose`(이때 `choice`는 `options` 중 하나), `instruct`, `dismiss` |
+| `review` | `accept`, `revise`, `instruct`, `dismiss` |
+| `send-ready` | `sent`, `revise`, `instruct`, `dismiss` |
 
-`reject`·`revise`·`instruct`는 `note`(한 줄 지시)가 있어야 합니다. `itemHash`가 지금의 item.json과 다르면 그 답은 무효이고 카드는 다시 「답 기다림」이 됩니다. 에이전트가 처리를 시작하기 전까지는 사람이 답을 바꿀 수 있습니다.
+`reject`·`revise`·`instruct`는 `note`(한 줄 지시)가 있어야 합니다. `dismiss`(사이드바 「필요 없음」)는 그 항목이 더는 필요 없다는 뜻이라 에이전트는 아무 일도 하지 않고 닫습니다. `itemHash`가 지금의 item.json과 다르면 그 답은 무효이고 카드는 다시 「답 기다림」이 됩니다. 에이전트가 처리를 시작하기 전까지는 사람이 답을 바꿀 수 있습니다.
 
 같은 답(판정·선택·지시)을 다시 누르면 아무것도 바뀌지 않고 에이전트에게도 다시 알리지 않습니다. 사이드바는 지금 답인 단추를 눌린 채 막아 두고, 답을 보내는 동안에는 그 카드의 단추를 모두 막습니다. 워커도 한 항목의 답을 한 번에 하나씩만 처리합니다. 다른 답으로 바꾸면 새로 쓰고 다시 알립니다.
 

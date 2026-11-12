@@ -119,6 +119,15 @@ test('verdicts are checked against the kind', () => {
   assert.throws(() => writeAnswer(dir, { id: '../escape', verdict: 'approve' }), /id/)
 })
 
+test('every kind can be dismissed without a note', () => {
+  const dir = queueDir()
+  for (const [i, kind] of (['approve', 'decide', 'review', 'send-ready'] as const).entries()) {
+    const id = `DQ-20261111-100000-dm${i}0`
+    putItem(dir, { ...approve(id), kind, options: ['A', 'B'], draft: 'x', sender: 'y' })
+    assert.equal(writeAnswer(dir, { id, verdict: 'dismiss' }).answer.verdict, 'dismiss')
+  }
+})
+
 test('once the agent takes an item the answer is locked', () => {
   const dir = queueDir()
   const id = 'DQ-20261111-100000-jjjj'
