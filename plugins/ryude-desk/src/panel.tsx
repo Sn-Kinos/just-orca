@@ -349,7 +349,7 @@ export default function Panel() {
     return (
       <Stack gap="md">
         <EmptyState
-          icon="bell"
+          icon="layers"
           title="아직 이 Mac에서 쓰지 않았어요"
           description="누르면 ~/.local/state/ryude/decisions 를 지켜보고, 답하면 류드 터미널에 항목 ID를 알립니다"
         />

@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "ryude-desk",
   "name": "류드 결재함",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Ryude's desk: the decisions an orchestrator agent needs from you, answered in the right sidebar.",
   "engines": {
     "orca": ">=1.4.248"
@@ -15,7 +15,7 @@
       {
         "id": "ryude-desk",
         "title": "류드 결재함",
-        "icon": "bell",
+        "icon": "layers",
         "entry": "src/panel.tsx",
         "ui": "components"
       }
@@ -24,7 +24,7 @@
       {
         "id": "waiting",
         "text": "결재 -",
-        "icon": "bell",
+        "icon": "layers",
         "tooltip": "오른쪽 사이드바의 류드 결재함"
       }
     ]
