@@ -182,6 +182,23 @@ test('finished items are grouped under their project too', async () => {
   await view.unmount()
 })
 
+test('line breaks in the body and proposal are kept, and long options get a full-width row each', async () => {
+  const long = 'Option text that is long enough that it would never fit on one button in a narrow sidebar'
+  const card: Card = {
+    item: { id: 'DQ-L', createdAt: at, project: 'Sample Shop', kind: 'decide', title: 'Pick one', body: 'First line.\nSecond line.', proposal: 'Do A.\nThen B.', options: [long, 'Short'] },
+    status: 'open'
+  }
+  const { host, answers } = setup({ configured: true, cards: [card], invalid: [] })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ testId: 'body-DQ-L-1' })?.text.includes('Second line.'))
+  assert.ok(view.find({ testId: 'proposal-DQ-L-1' })?.text.includes('Then B.'))
+  const row = view.find({ testId: 'choose-DQ-L-0' })
+  assert.equal(row?.type, 'ListItem')
+  await view.press({ testId: 'choose-DQ-L-0' })
+  assert.deepEqual(answers.at(-1), { id: 'DQ-L', verdict: 'choose', choice: long })
+  await view.unmount()
+})
+
 test('a worker post replaces what the panel shows', async () => {
   const { host } = setup({ configured: true, cards: [], invalid: [] })
   const view = await mount(panel, { host })

@@ -7,6 +7,8 @@ import {
   Callout,
   Collapsible,
   EmptyState,
+  List,
+  ListItem,
   plugin,
   read,
   RelativeTime,
@@ -134,20 +136,22 @@ function Answers({ card }: { card: QueueCard }) {
   const open = !!read(noteOpen)[id]
   return (
     <Stack gap="sm">
-      <Row gap="xs" wrap>
-        {[
-          ...(kind === 'decide' ? options ?? [] : []).map((option, i) => (
-            <Button
+      {kind === 'decide' && (
+        <List label="선택지">
+          {(options ?? []).map((option, i) => (
+            <ListItem
               key={`choose-${id}-${i}`}
-              variant="solid"
-              tone={current?.choice === option ? 'accent' : 'neutral'}
-              icon={current?.choice === option ? 'check' : undefined}
+              title={option}
+              icon={current?.choice === option ? 'check' : 'next'}
+              current={current?.choice === option}
               disabled={locked || current?.choice === option}
               onPress={() => answer(id, 'choose', option)}
-            >
-              {option}
-            </Button>
-          )),
+            />
+          ))}
+        </List>
+      )}
+      <Row gap="xs" wrap>
+        {[
           ...BUTTONS[kind].map((verdict) => {
             const chosen = current?.verdict === verdict && !NEEDS_NOTE.includes(verdict)
             return (
@@ -210,6 +214,22 @@ function AnswerState({ card }: { card: QueueCard }) {
   )
 }
 
+/** One Text per line, so a line break the agent wrote stays a line break. */
+function Lines({ id, text, muted, medium }: { id: string; text: string; muted?: boolean; medium?: boolean }) {
+  return (
+    <Stack gap="xs">
+      {text
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line, i) => (
+          <Text key={`${id}-${i}`} size="sm" muted={muted} weight={medium ? 'medium' : undefined}>
+            {line}
+          </Text>
+        ))}
+    </Stack>
+  )
+}
+
 function QueueItem({ card }: { card: QueueCard }) {
   const { item } = card
   const kind = KIND[item.kind]
@@ -225,24 +245,18 @@ function QueueItem({ card }: { card: QueueCard }) {
         </Text>
       </Row>
       <Text weight="semibold">{item.title}</Text>
-      {item.body && (
-        <Text muted size="sm">
-          {item.body}
-        </Text>
-      )}
+      {item.body && <Lines id={`body-${item.id}`} text={item.body} muted />}
       {card.stale && (
         <Callout tone="warning" icon="warning">
           항목이 바뀌어 이전 답은 무효입니다. 다시 답해 주세요.
         </Callout>
       )}
       {item.proposal && (
-        <Box background="muted" radius="sm" paddingX="md" paddingY="sm" direction="row" gap="xs" align="center">
+        <Box background="muted" radius="sm" paddingX="md" paddingY="sm" gap="xs">
           <Text size="xs" muted>
             류드 제안
           </Text>
-          <Text size="sm" weight="medium">
-            {item.proposal}
-          </Text>
+          <Lines id={`proposal-${item.id}`} text={item.proposal} medium />
         </Box>
       )}
       {item.kind === 'send-ready' && (
