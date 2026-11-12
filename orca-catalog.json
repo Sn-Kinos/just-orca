@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-catalog.v2.schema.json",
+  "catalogVersion": 2,
+  "name": "Just Orca · 류드",
+  "owner": "Sn-Kinos",
+  "plugins": [
+    {
+      "id": "sn-kinos.ryude-desk",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/Sn-Kinos/just-orca.git",
+        "ref": "main",
+        "path": "plugins/ryude-desk"
+      },
+      "description": "류드 결재함: 오케스트레이터 에이전트가 올린 승인·결정·검토·발송 준비를 오른쪽 사이드바에서 처리",
+      "categories": [
+        "agents"
+      ],
+      "releases": [
+        {
+          "version": "0.5.0",
+          "commit": "c73fe062587446d9ded0fed7c4a6df9ba95b1c40",
+          "contentHash": "9001e8f5c57c4aa5ce749034e38fdc6274ca205f6f610e958f694f91f317b6e5",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "류드 결재함",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "류드 결재함"
+            },
+            {
+              "kind": "statusBarItems",
+              "name": "결재 -"
+            }
+          ],
+          "capabilities": [
+            "storage:own",
+            "notifications:show"
+          ]
+        }
+      ]
+    }
+  ]
+}
