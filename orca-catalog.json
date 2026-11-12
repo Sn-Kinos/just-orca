@@ -18,6 +18,28 @@
       ],
       "releases": [
         {
+          "version": "0.5.1",
+          "commit": "9c5ebd8b8319891252efa8191569662e5cf0960e",
+          "contentHash": "3d992d55a57c341951be95c770e6aace37d2e1bd5a40d25f44b8f12fe081f103",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "류드 결재함",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "류드 결재함"
+            },
+            {
+              "kind": "statusBarItems",
+              "name": "결재 -"
+            }
+          ],
+          "capabilities": [
+            "storage:own",
+            "notifications:show"
+          ]
+        },
+        {
           "version": "0.5.0",
           "commit": "c73fe062587446d9ded0fed7c4a6df9ba95b1c40",
           "contentHash": "9001e8f5c57c4aa5ce749034e38fdc6274ca205f6f610e958f694f91f317b6e5",
