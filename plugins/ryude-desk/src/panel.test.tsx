@@ -271,6 +271,20 @@ test('a note opened by 고쳐 줘 sends only revise, and closes empty once it is
   await view.unmount()
 })
 
+test('⌘Enter in a note sends it like the send button, and an empty note shows the error', async () => {
+  const { host, answers } = setup({ configured: true, cards, invalid: [] })
+  const view = await mount(panel, { host })
+  await view.press({ testId: 'revise-DQ-3' })
+  assert.ok(String(view.find({ testId: 'note-DQ-3' })?.props.placeholder).endsWith(' (⌘Enter 보내기)'))
+  await view.submit({ testId: 'note-DQ-3' })
+  assert.deepEqual(answers, [], 'an empty note is not sent')
+  assert.ok(view.find({ testId: 'error-DQ-3' })?.text.includes('무엇을 고칠지'))
+  await view.type({ testId: 'note-DQ-3' }, 'Say Monday instead', { submit: true })
+  assert.deepEqual(answers, [{ id: 'DQ-3', verdict: 'revise', note: 'Say Monday instead' }])
+  assert.equal(view.find({ testId: 'note-DQ-3' }), null, 'the note closes after sending')
+  await view.unmount()
+})
+
 test('a note opened by 지시 sends instruct, with its own wording', async () => {
   const { host, answers } = setup({ configured: true, cards, invalid: [] })
   const view = await mount(panel, { host })
