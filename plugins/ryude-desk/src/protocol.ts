@@ -40,6 +40,8 @@ export type Card = {
 }
 export type Invalid = { id: string; reason: string }
 export type QueueView = { configured: boolean; cards: Card[]; invalid: Invalid[] }
+/** One entry of an item's evidence list; the panel never sends a path. */
+export type EvidenceRef = { id: string; index: number }
 export type AnswerInput = { id: string; verdict: Verdict; choice?: string; note?: string }
 
 declare module 'orca' {
@@ -50,8 +52,8 @@ declare module 'orca' {
     'queue.list': { output: QueueView }
     /** Writes the person's answer, then tells the agent's terminal the item id. */
     'queue.answer': { input: AnswerInput; output: QueueView }
-    /** Opens one evidence file of an item, or reveals it in Finder. */
-    'evidence.open': { input: { id: string; index: number }; output: { mode: 'open' | 'reveal' } }
+    /** Puts the file itself on the clipboard (public.file-url), as Finder's Copy does. */
+    'evidence.copy': { input: EvidenceRef; output: { copied: boolean } }
   }
   interface PluginPanelEvents {
     /** Posted to every open panel after the folder changes or an answer is written. */

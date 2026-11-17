@@ -93,12 +93,23 @@ function relayText(answer: { relayed: boolean | null; at: string }): { text: str
   return { text: '류드에게 알리지 못함', warn: true }
 }
 
-async function openEvidence(id: string, index: number): Promise<void> {
+/** How long a file button reads 복사됨 after it copied its file. */
+export const COPIED_MS = 1_500
+/** `${id}-${index}` of the evidence buttons that read 복사됨. */
+const copied = atom<Record<string, boolean>>({})
+
+/** Asks the worker to put the file on the clipboard; the panel sends the id and index, never the path. */
+async function copyEvidence(id: string, index: number): Promise<void> {
+  setError(id, '')
   try {
-    await plugin.request('evidence.open', { id, index })
+    await plugin.request('evidence.copy', { id, index })
   } catch (e) {
     setError(id, String((e as Error).message ?? e))
+    return
   }
+  const key = `${id}-${index}`
+  update(copied, (all) => ({ ...all, [key]: true }))
+  setTimeout(() => update(copied, (all) => ({ ...all, [key]: false })), COPIED_MS)
 }
 
 export function setup(ctx: PanelContext): () => void {
@@ -273,11 +284,22 @@ function QueueItem({ card }: { card: QueueCard }) {
       )}
       {evidence.length > 0 && (
         <Row gap="xs" wrap>
-          {evidence.map((e, i) => (
-            <Button key={`evidence-${item.id}-${i}`} size="sm" variant="solid" tone="neutral" icon={evidenceIcon(e.path)} onPress={() => openEvidence(item.id, i)}>
-              {e.label}
-            </Button>
-          ))}
+          {evidence.map((e, i) => {
+            const done = !!read(copied)[`${item.id}-${i}`]
+            return (
+              <Button
+                key={`evidence-${item.id}-${i}`}
+                size="sm"
+                variant="solid"
+                tone="neutral"
+                icon={done ? 'check' : evidenceIcon(e.path)}
+                tooltip="눌러서 파일 복사(⌘V로 붙여 넣기)"
+                onPress={() => copyEvidence(item.id, i)}
+              >
+                {done ? '복사됨' : e.label}
+              </Button>
+            )
+          })}
         </Row>
       )}
       <AnswerState card={card} />

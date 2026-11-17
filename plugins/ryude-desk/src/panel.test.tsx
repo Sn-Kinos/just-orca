@@ -1,4 +1,5 @@
 // The sidebar, against a stand-in worker. Project names here are invented.
+import { mock } from 'node:test'
 import { assert, mockHost, mount, test } from 'orca/testing'
 import type { AnswerInput, Card, QueueView } from './protocol'
 import * as panel from './panel'
@@ -15,7 +16,7 @@ const cards: Card[] = [
 
 function setup(view: QueueView) {
   const answers: AnswerInput[] = []
-  const opened: unknown[] = []
+  const copied: unknown[] = []
   const host = mockHost({
     requests: {
       'queue.list': () => view,
@@ -24,13 +25,13 @@ function setup(view: QueueView) {
         answers.push(input)
         return view
       },
-      'evidence.open': (input: unknown) => {
-        opened.push(input)
-        return { mode: 'open' as const }
+      'evidence.copy': (input: unknown) => {
+        copied.push(input)
+        return { copied: true }
       }
     }
   })
-  return { host, answers, opened }
+  return { host, answers, copied }
 }
 
 test('before setup it offers one button and reads nothing else', async () => {
@@ -43,7 +44,7 @@ test('before setup it offers one button and reads nothing else', async () => {
 })
 
 test('each kind gets its own answers, and a note is required where README says', async () => {
-  const { host, answers, opened } = setup({ configured: true, cards, invalid: [] })
+  const { host, answers } = setup({ configured: true, cards, invalid: [] })
   const view = await mount(panel, { host })
 
   await view.press({ testId: 'approve-DQ-1' })
@@ -63,9 +64,6 @@ test('each kind gets its own answers, and a note is required where README says',
   assert.ok(view.find({ testId: 'draft-DQ-3' }))
   await view.press({ testId: 'sent-DQ-3' })
   assert.deepEqual(answers.at(-1), { id: 'DQ-3', verdict: 'sent' })
-
-  await view.press({ testId: 'evidence-DQ-1-0' })
-  assert.deepEqual(opened, [{ id: 'DQ-1', index: 0 }])
 
   assert.deepEqual(view.errors, [])
   assert.deepEqual(view.refusals, [])
@@ -205,6 +203,51 @@ test('each card offers 필요 없음, which answers dismiss with no note', async
   await view.press({ testId: 'dismiss-DQ-3' })
   assert.deepEqual(answers.at(-1), { id: 'DQ-3', verdict: 'dismiss' })
   assert.ok(view.find({ testId: 'dismiss-DQ-2' }), 'decide cards have it too')
+  await view.unmount()
+})
+
+test('a file button copies its file by id and index, reads 복사됨 for 1.5 seconds, then its name again', async () => {
+  const two: Card = { ...cards[0], item: { ...cards[0].item, evidence: [...(cards[0].item.evidence ?? []), { label: 'deck', path: '/tmp/deck.pdf' }] } }
+  const { host, copied } = setup({ configured: true, cards: [two], invalid: [] })
+  const view = await mount(panel, { host })
+  const button = view.find({ testId: 'evidence-DQ-1-1' })
+  assert.equal(button?.text, 'deck')
+  assert.equal(button?.props.tooltip, '눌러서 파일 복사(⌘V로 붙여 넣기)')
+  assert.equal(view.findAll({ type: 'IconButton' }).length, 0, 'no separate copy icon')
+
+  mock.timers.enable({ apis: ['setTimeout'] })
+  try {
+    await view.press({ testId: 'evidence-DQ-1-1' })
+    assert.deepEqual(copied, [{ id: 'DQ-1', index: 1 }])
+    assert.equal(view.find({ testId: 'evidence-DQ-1-1' })?.text, '복사됨')
+    assert.equal(view.find({ testId: 'evidence-DQ-1-1' })?.props.icon, 'check')
+    assert.equal(view.find({ testId: 'evidence-DQ-1-0' })?.text, 'recording', 'only the pressed file')
+    mock.timers.tick(panel.COPIED_MS - 1)
+    await view.settled()
+    assert.equal(view.find({ testId: 'evidence-DQ-1-1' })?.text, '복사됨')
+    mock.timers.tick(1)
+    await view.settled()
+    assert.equal(view.find({ testId: 'evidence-DQ-1-1' })?.text, 'deck')
+  } finally {
+    mock.timers.reset()
+  }
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test("a failed copy shows the worker's reason on the card and never reads 복사됨", async () => {
+  const host = mockHost({
+    requests: {
+      'queue.list': () => ({ configured: true, cards, invalid: [] }),
+      'evidence.copy': () => {
+        throw Object.assign(new Error('증거 파일이 없습니다: /tmp/run.mp4'), { code: 'not_found' })
+      }
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ testId: 'evidence-DQ-1-0' })
+  assert.ok(view.find({ testId: 'error-DQ-1' })?.text.includes('증거 파일이 없습니다'))
+  assert.equal(view.find({ testId: 'evidence-DQ-1-0' })?.text, 'recording')
   await view.unmount()
 })
 
