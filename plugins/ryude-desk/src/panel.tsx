@@ -165,9 +165,14 @@ function Answers({ card }: { card: QueueCard }) {
           key={`note-${id}`}
           label={NOTE[open].label}
           rows={2}
-          placeholder={NOTE[open].placeholder}
+          placeholder={`${NOTE[open].placeholder} (⌘Enter 보내기)`}
           defaultValue={read(notes)[id] ?? ''}
           onChange={(value) => update(notes, (all) => ({ ...all, [id]: value }))}
+          onSubmit={(value) => {
+            if (locked) return
+            update(notes, (all) => ({ ...all, [id]: value }))
+            void answer(id, open)
+          }}
         />
         <Row gap="xs" wrap>
           {[
