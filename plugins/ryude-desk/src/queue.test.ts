@@ -3,7 +3,7 @@ import { assert, test } from 'orca/testing'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { evidenceTarget, hashOf, loadQueue, markRelayed, writeAnswer } from './queue'
+import { evidenceFile, hashOf, loadQueue, markRelayed, writeAnswer } from './queue'
 
 function queueDir(): string {
   return mkdtempSync(join(tmpdir(), 'dq-test-'))
@@ -143,12 +143,24 @@ test('once the agent takes an item the answer is locked', () => {
   assert.equal(card.stateNote, 'merged')
 })
 
-test('evidence opens only listed media and documents; anything else is revealed', () => {
+test('copy takes only a listed absolute path that exists, folders included', () => {
   const dir = queueDir()
-  const id = 'DQ-20261111-100000-kkkk'
-  putItem(dir, approve(id))
-  assert.deepEqual(evidenceTarget(dir, id, 0), { path: '/tmp/dq-evidence/run.mp4', mode: 'open' })
-  assert.deepEqual(evidenceTarget(dir, id, 1), { path: '/tmp/dq-evidence/Thing.app', mode: 'reveal' })
-  assert.throws(() => evidenceTarget(dir, id, 2), /absolute/)
-  assert.throws(() => evidenceTarget(dir, id, 3), /evidence/)
+  const files = mkdtempSync(join(tmpdir(), 'dq-files-'))
+  writeFileSync(join(files, 'run.mp4'), 'video')
+  mkdirSync(join(files, 'Thing.app'))
+  const id = 'DQ-20261111-100000-llll'
+  putItem(dir, {
+    ...approve(id),
+    evidence: [
+      { label: 'recording', path: join(files, 'run.mp4') },
+      { label: 'bundle', path: join(files, 'Thing.app') },
+      { label: 'relative', path: 'notes.md' },
+      { label: 'gone', path: join(files, 'gone.pdf') }
+    ]
+  })
+  assert.equal(evidenceFile(dir, id, 0), join(files, 'run.mp4'))
+  assert.equal(evidenceFile(dir, id, 1), join(files, 'Thing.app'))
+  assert.throws(() => evidenceFile(dir, id, 2), /absolute/)
+  assert.throws(() => evidenceFile(dir, id, 3), /증거 파일이 없습니다/)
+  assert.throws(() => evidenceFile(dir, id, 4), /no evidence 4/)
 })

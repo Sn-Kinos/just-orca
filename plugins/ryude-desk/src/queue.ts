@@ -1,8 +1,8 @@
 // The queue folder, as README.md describes it: one folder per item, one writer per file.
 // This module only reads item.json and state.json, and only writes answer.json.
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { extname, isAbsolute, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 import type { Answer, AnswerInput, Card, Invalid, Item, Kind, Status, Verdict } from './protocol'
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/
@@ -13,9 +13,6 @@ const KINDS: Record<Kind, Verdict[]> = {
   'send-ready': ['sent', 'revise', 'instruct', 'dismiss']
 }
 const NEEDS_NOTE: Verdict[] = ['reject', 'revise', 'instruct']
-const OPENABLE = new Set(
-  'mp4 mov m4v png jpg jpeg gif webp heic pdf txt md csv html json docx xlsx pptx hwp hwpx'.split(' ')
-)
 const DONE_SHOWN = 10
 
 export const hashOf = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex')
@@ -122,12 +119,12 @@ export function markRelayed(dir: string, id: string, relayed: boolean): void {
   if (answer) writeJson(path, { ...answer, relayed })
 }
 
-export function evidenceTarget(dir: string, id: string, index: number): { path: string; mode: 'open' | 'reveal' } {
+/** The listed evidence path to copy: absolute, and it must exist (a folder counts, as in Finder). */
+export function evidenceFile(dir: string, id: string, index: number): string {
   const { item } = readItem(dir, id)
   const entry = item.evidence?.[index]
   if (!entry) throw Object.assign(new Error(`no evidence ${index} on ${id}`), { code: 'not_found' })
   if (!isAbsolute(entry.path)) throw Object.assign(new Error(`evidence path must be absolute: ${entry.path}`), { code: 'invalid_params' })
-  const isDir = existsSync(entry.path) && statSync(entry.path).isDirectory()
-  const ext = extname(entry.path).slice(1).toLowerCase()
-  return { path: entry.path, mode: !isDir && OPENABLE.has(ext) ? 'open' : 'reveal' }
+  if (!existsSync(entry.path)) throw Object.assign(new Error(`증거 파일이 없습니다: ${entry.path}`), { code: 'not_found' })
+  return entry.path
 }

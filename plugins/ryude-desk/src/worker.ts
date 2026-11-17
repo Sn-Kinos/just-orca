@@ -1,15 +1,16 @@
 // The plugin's worker. With a status bar item it runs for as long as the plugin is enabled, so it
 // can watch the queue folder and announce new items even while the panel is closed.
-// Nothing is read, typed or opened until the person presses setup in the panel (README.md).
+// Nothing is read, typed or copied until the person presses setup in the panel (README.md).
 import type { OrcaWorkerApi } from 'orca/worker'
-import { execFile } from 'node:child_process'
 import { mkdirSync, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import type { AnswerInput, QueueView } from './protocol'
-import { evidenceTarget, loadQueue, markRelayed, writeAnswer } from './queue'
+import { copyFile } from './launch'
+import { evidenceFile, loadQueue, markRelayed, writeAnswer } from './queue'
 import { relayAnswer, type RelayConfig } from './relay'
 
-type Config = RelayConfig & { dir: string; open: 'system' | 'none' }
+/** open: 'none' runs no macOS tool, so copying leaves the clipboard alone (tests and check). */
+type Config = RelayConfig & { dir: string; open: 'system' | 'none'; osascript: string }
 const CONFIG = 'config'
 const NOTIFIED = 'notified'
 const BAR = 'waiting'
@@ -36,13 +37,20 @@ function defaults(): Config {
     open: 'system',
     orcaBin: '/Applications/Orca.app/Contents/Resources/bin/orca',
     workspace: join(home, 'orca'),
-    agentTitle: '류드'
+    agentTitle: '류드',
+    osascript: '/usr/bin/osascript'
   }
 }
 
 async function config(orca: OrcaWorkerApi): Promise<Config | null> {
   const value = (await orca.storage.get(CONFIG)) as Partial<Config> | null
   return value && typeof value.dir === 'string' ? { ...defaults(), ...value } : null
+}
+
+async function configured(orca: OrcaWorkerApi): Promise<Config> {
+  const cfg = await config(orca)
+  if (!cfg) throw Object.assign(new Error('set up the queue first'), { code: 'conflict' })
+  return cfg
 }
 
 /** Reads the queue, then updates the status bar and announces items not announced before. */
@@ -101,8 +109,7 @@ export default async function activate(orca: OrcaWorkerApi): Promise<void> {
   })
 
   orca.panels.handle('queue.answer', async (input: AnswerInput) => {
-    const cfg = await config(orca)
-    if (!cfg) throw Object.assign(new Error('set up the queue first'), { code: 'conflict' })
+    const cfg = await configured(orca)
     return oneAtATime(input.id, async () => {
       const { changed } = writeAnswer(cfg.dir, input)
       if (changed) markRelayed(cfg.dir, input.id, await relayAnswer(cfg, input.id, (m) => orca.log(m)))
@@ -110,15 +117,13 @@ export default async function activate(orca: OrcaWorkerApi): Promise<void> {
     })
   })
 
-  orca.panels.handle('evidence.open', async ({ id, index }) => {
-    const cfg = await config(orca)
-    if (!cfg) throw Object.assign(new Error('set up the queue first'), { code: 'conflict' })
-    const target = evidenceTarget(cfg.dir, id, index)
-    if (cfg.open === 'system') {
-      const args = target.mode === 'open' ? [target.path] : ['-R', target.path]
-      execFile('/usr/bin/open', args, (err) => err && orca.log(`open failed: ${err.message}`))
-    }
-    return { mode: target.mode }
+  // copied is false when the worker is set to launch nothing (open: 'none').
+  orca.panels.handle('evidence.copy', async ({ id, index }) => {
+    const cfg = await configured(orca)
+    const path = evidenceFile(cfg.dir, id, index)
+    if (cfg.open !== 'system') return { copied: false }
+    await copyFile(cfg.osascript, path)
+    return { copied: true }
   })
 
   await startWatching(orca)

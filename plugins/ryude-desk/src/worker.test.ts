@@ -1,6 +1,6 @@
 // Runs src/worker.ts's activate(orca) over a mock host and a temporary queue folder.
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as main from './worker'
@@ -66,7 +66,8 @@ test('setup stores the default folder and handle file under HOME', async () => {
       open: 'system',
       orcaBin: '/Applications/Orca.app/Contents/Resources/bin/orca',
       workspace: join(home, 'orca'),
-      agentTitle: '류드'
+      agentTitle: '류드',
+      osascript: '/usr/bin/osascript'
     })
     assert.ok(existsSync(join(home, '.local/state/ryude/decisions')))
     await worker.deactivate()
@@ -178,13 +179,55 @@ test('a new waiting item is announced once and counted in the status bar', async
   assert.equal(host.callsOf('notifications.show').length, 1)
 })
 
-test('evidence is opened through the configured opener only', async () => {
+/** A stand-in osascript that logs its arguments. */
+function fakeTools(q: Queue, open: 'system' | 'none' = 'system') {
+  const root = join(q.dir, '..')
+  const log = join(root, 'tools.log')
+  const osascript = join(root, 'osascript')
+  writeFileSync(osascript, `#!/bin/sh\nfor a in "$@"; do printf 'osascript %s\\n' "$a" >> '${log}'; done\necho ok\n`)
+  chmodSync(osascript, 0o755)
+  const files = join(root, 'files')
+  mkdirSync(files)
+  writeFileSync(join(files, 'run 1.mp4'), 'video')
+  const config = { ...q.config, open, osascript }
+  const lines = () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [])
+  return { config, files, lines }
+}
+
+
+test('copy puts the listed file on the clipboard through the configured osascript, as arguments', async () => {
   const q = setupQueue()
-  const id = 'DQ-20261111-100000-dddd'
-  putItem(q.dir, id, { evidence: [{ label: 'deck', path: '/tmp/dq-evidence/deck.pdf' }] })
-  const host = mockHost({ results: RESULTS, storage: { config: q.config } })
-  const worker = await mountWorker(main, { host })
-  assert.deepEqual(await worker.request('evidence.open', { id, index: 0 }), { mode: 'open' })
-  await assert.rejects(worker.request('evidence.open', { id, index: 5 }))
+  const t = fakeTools(q)
+  const id = 'DQ-20261111-100000-hhhh'
+  const file = join(t.files, 'run 1.mp4')
+  putItem(q.dir, id, {
+    evidence: [
+      { label: 'recording', path: file },
+      { label: 'relative', path: 'run.mp4' },
+      { label: 'gone', path: join(t.files, 'gone.pdf') }
+    ]
+  })
+  const worker = await mountWorker(main, { host: mockHost({ results: RESULTS, storage: { config: t.config } }) })
+  assert.deepEqual(await worker.request('evidence.copy', { id, index: 0 }), { copied: true })
+  const lines = t.lines()
+  assert.deepEqual(lines.slice(0, 3), ['osascript -l', 'osascript JavaScript', 'osascript -e'])
+  assert.ok(lines[3].includes('NSPasteboard') && lines[3].includes('writeObjects') && lines[3].includes('fileURLWithPath'))
+  assert.equal(lines[4], `osascript ${file}`, 'the path is one argument, not shell text')
+  await assert.rejects(worker.request('evidence.copy', { id, index: 1 }), /absolute/)
+  await assert.rejects(worker.request('evidence.copy', { id, index: 2 }), /증거 파일이 없습니다/)
+  await assert.rejects(worker.request('evidence.copy', { id, index: 3 }), /no evidence/)
+  assert.equal(t.lines().length, 5, 'refused requests run nothing')
+  await worker.deactivate()
+})
+
+test('with open set to none, copy touches no clipboard but still checks the entry', async () => {
+  const q = setupQueue()
+  const t = fakeTools(q, 'none')
+  const id = 'DQ-20261111-100000-kkkk'
+  putItem(q.dir, id, { evidence: [{ label: 'recording', path: join(t.files, 'run 1.mp4') }] })
+  const worker = await mountWorker(main, { host: mockHost({ results: RESULTS, storage: { config: t.config } }) })
+  assert.deepEqual(await worker.request('evidence.copy', { id, index: 0 }), { copied: false })
+  await assert.rejects(worker.request('evidence.copy', { id, index: 3 }), /no evidence/)
+  assert.deepEqual(t.lines(), [])
   await worker.deactivate()
 })

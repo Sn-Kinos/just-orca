@@ -32,8 +32,14 @@ const sending = atom<Record<string, boolean>>({})
 const RELAY_GRACE_MS = 30_000
 /** How often an open panel reads the queue itself, in case a worker post never arrived. */
 export const POLL_MS = 5_000
-/** Cards whose one-line note field is open. */
-const noteOpen = atom<Record<string, boolean>>({})
+type NoteVerdict = 'reject' | 'revise' | 'instruct'
+/** Per card, the verdict whose note field is open; only that verdict can be sent while it is. */
+const noteFor = atom<Record<string, NoteVerdict | undefined>>({})
+const NOTE: Record<NoteVerdict, { label: string; placeholder: string; send: string }> = {
+  reject: { label: '반려 이유', placeholder: '왜 반려하는지 한 줄로', send: '반려 보내기' },
+  revise: { label: '무엇을 고칠지', placeholder: '무엇을 어떻게 고칠지 한 줄로', send: '고쳐 줘 보내기' },
+  instruct: { label: '류드에게 지시', placeholder: '류드에게 보낼 한 줄 지시', send: '지시 보내기' }
+}
 
 const KIND: Record<Kind, { label: string; tone: Tone }> = {
   approve: { label: '승인 요청', tone: 'neutral' },
@@ -60,17 +66,17 @@ const BUTTONS: Record<Kind, Verdict[]> = {
   review: ['accept', 'revise'],
   'send-ready': ['sent', 'revise']
 }
-const NEEDS_NOTE: Verdict[] = ['reject', 'revise', 'instruct']
+const needsNote = (verdict: Verdict): verdict is NoteVerdict => verdict in NOTE
 
 function setError(id: string, message: string): void {
   update(errors, (all) => ({ ...all, [id]: message }))
 }
 
+/** Sends an answer; a verdict that needs a note sends the open field's text, and closes it once sent. */
 async function answer(id: string, verdict: Verdict, choice?: string): Promise<void> {
-  const note = (read(notes)[id] ?? '').trim()
-  if (NEEDS_NOTE.includes(verdict) && !note) {
-    update(noteOpen, (all) => ({ ...all, [id]: true }))
-    setError(id, `${VERDICT[verdict]}에는 한 줄 지시를 적어 주세요`)
+  const note = needsNote(verdict) ? (read(notes)[id] ?? '').trim() : ''
+  if (needsNote(verdict) && !note) {
+    setError(id, `${NOTE[verdict].label}를 적어 주세요`)
     return
   }
   if (read(sending)[id]) return
@@ -79,11 +85,17 @@ async function answer(id: string, verdict: Verdict, choice?: string): Promise<vo
   try {
     const input = { id, verdict, ...(choice !== undefined ? { choice } : {}), ...(note ? { note } : {}) }
     set(queue, await plugin.request('queue.answer', input))
+    if (note) closeNote(id)
   } catch (e) {
     setError(id, String((e as Error).message ?? e))
   } finally {
     update(sending, (all) => ({ ...all, [id]: false }))
   }
+}
+
+function openNote(id: string, verdict: NoteVerdict): void {
+  setError(id, '')
+  update(noteFor, (all) => ({ ...all, [id]: verdict }))
 }
 
 /** What the card says about telling the agent; null right after an answer means it is on its way. */
@@ -93,12 +105,23 @@ function relayText(answer: { relayed: boolean | null; at: string }): { text: str
   return { text: '류드에게 알리지 못함', warn: true }
 }
 
-async function openEvidence(id: string, index: number): Promise<void> {
+/** How long a file button reads 복사됨 after it copied its file. */
+export const COPIED_MS = 1_500
+/** `${id}-${index}` of the evidence buttons that read 복사됨. */
+const copied = atom<Record<string, boolean>>({})
+
+/** Asks the worker to put the file on the clipboard; the panel sends the id and index, never the path. */
+async function copyEvidence(id: string, index: number): Promise<void> {
+  setError(id, '')
   try {
-    await plugin.request('evidence.open', { id, index })
+    await plugin.request('evidence.copy', { id, index })
   } catch (e) {
     setError(id, String((e as Error).message ?? e))
+    return
   }
+  const key = `${id}-${index}`
+  update(copied, (all) => ({ ...all, [key]: true }))
+  setTimeout(() => update(copied, (all) => ({ ...all, [key]: false })), COPIED_MS)
 }
 
 export function setup(ctx: PanelContext): () => void {
@@ -125,7 +148,7 @@ function evidenceIcon(path: string): IconName {
 
 /** Closes a card's note field and forgets what was typed in it. */
 function closeNote(id: string): void {
-  update(noteOpen, (all) => ({ ...all, [id]: false }))
+  update(noteFor, (all) => ({ ...all, [id]: undefined }))
   update(notes, (all) => ({ ...all, [id]: '' }))
   setError(id, '')
 }
@@ -134,7 +157,30 @@ function Answers({ card }: { card: QueueCard }) {
   const { id, kind, options } = card.item
   const locked = !!read(sending)[id]
   const current = card.answer
-  const open = !!read(noteOpen)[id]
+  const open = read(noteFor)[id]
+  if (open)
+    return (
+      <Stack gap="sm">
+        <Textarea
+          key={`note-${id}`}
+          label={NOTE[open].label}
+          rows={2}
+          placeholder={NOTE[open].placeholder}
+          defaultValue={read(notes)[id] ?? ''}
+          onChange={(value) => update(notes, (all) => ({ ...all, [id]: value }))}
+        />
+        <Row gap="xs" wrap>
+          {[
+            <Button key={`send-${id}`} variant="solid" tone="accent" disabled={locked} onPress={() => answer(id, open)}>
+              {NOTE[open].send}
+            </Button>,
+            <Button key={`cancel-${id}`} variant="ghost" disabled={locked} onPress={() => closeNote(id)}>
+              취소
+            </Button>
+          ]}
+        </Row>
+      </Stack>
+    )
   return (
     <Stack gap="sm">
       {kind === 'decide' && (
@@ -154,7 +200,7 @@ function Answers({ card }: { card: QueueCard }) {
       <Row gap="xs" wrap>
         {[
           ...BUTTONS[kind].map((verdict) => {
-            const chosen = current?.verdict === verdict && !NEEDS_NOTE.includes(verdict)
+            const chosen = current?.verdict === verdict && !needsNote(verdict)
             return (
               <Button
                 key={`${verdict}-${id}`}
@@ -162,7 +208,7 @@ function Answers({ card }: { card: QueueCard }) {
                 tone={PRIMARY.includes(verdict) ? 'accent' : 'neutral'}
                 icon={chosen ? 'check' : undefined}
                 disabled={locked || chosen}
-                onPress={() => answer(id, verdict)}
+                onPress={() => (needsNote(verdict) ? openNote(id, verdict) : answer(id, verdict))}
               >
                 {VERDICT[verdict]}
               </Button>
@@ -171,29 +217,11 @@ function Answers({ card }: { card: QueueCard }) {
           <Button key={`dismiss-${id}`} variant="ghost" icon="close" disabled={locked || current?.verdict === 'dismiss'} onPress={() => answer(id, 'dismiss')}>
             필요 없음
           </Button>,
-          <Button key={`instruct-${id}`} variant="ghost" icon="edit" disabled={locked} onPress={() => (open ? answer(id, 'instruct') : update(noteOpen, (all) => ({ ...all, [id]: true })))}>
-            {open ? '지시 보내기' : '지시'}
-          </Button>,
-          ...(open
-            ? [
-                <Button key={`cancel-${id}`} variant="ghost" disabled={locked} onPress={() => closeNote(id)}>
-                  취소
-                </Button>
-              ]
-            : [])
+          <Button key={`instruct-${id}`} variant="ghost" icon="edit" disabled={locked} onPress={() => openNote(id, 'instruct')}>
+            지시
+          </Button>
         ]}
       </Row>
-      {open && (
-        <Textarea
-          key={`note-${id}`}
-          label="한 줄 지시"
-          labelHidden
-          rows={2}
-          placeholder="류드에게 보낼 한 줄 지시 (반려 · 고쳐 줘에도 쓰입니다)"
-          defaultValue={read(notes)[id] ?? ''}
-          onChange={(value) => update(notes, (all) => ({ ...all, [id]: value }))}
-        />
-      )}
     </Stack>
   )
 }
@@ -273,11 +301,22 @@ function QueueItem({ card }: { card: QueueCard }) {
       )}
       {evidence.length > 0 && (
         <Row gap="xs" wrap>
-          {evidence.map((e, i) => (
-            <Button key={`evidence-${item.id}-${i}`} size="sm" variant="solid" tone="neutral" icon={evidenceIcon(e.path)} onPress={() => openEvidence(item.id, i)}>
-              {e.label}
-            </Button>
-          ))}
+          {evidence.map((e, i) => {
+            const done = !!read(copied)[`${item.id}-${i}`]
+            return (
+              <Button
+                key={`evidence-${item.id}-${i}`}
+                size="sm"
+                variant="solid"
+                tone="neutral"
+                icon={done ? 'check' : evidenceIcon(e.path)}
+                tooltip="눌러서 파일 복사(⌘V로 붙여 넣기)"
+                onPress={() => copyEvidence(item.id, i)}
+              >
+                {done ? '복사됨' : e.label}
+              </Button>
+            )
+          })}
         </Row>
       )}
       <AnswerState card={card} />
